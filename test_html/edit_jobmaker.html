@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]>      <html class="no-js"> <!--<![endif]-->
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title>edit</title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="">
+    </head>
+    <body>
+        <!--[if lt IE 7]>
+            <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="#">upgrade your browser</a> to improve your experience.</p>
+        <![endif]-->
+        
+        
+        <form action="/edit/jobmaker" method="POST">
+            <input type="text" name="first_name" id="first_name" maxlength="30"/> first_name<br>
+            <input type="text" name="last_name" id="last_name" maxlength="30" /> last_name<br>
+            <input type="tel" name="phone_num" id="phone_num" /> phone_num<br>
+            <input type="text" name="country" id="country" maxlength="2" /> country | put 2 letter only here <br>
+            <input type="date" name="birthdate" id="birthdate" /> birthdate<br>
+            <select name="gender" id="gender">
+            <option value="0" selected>male</option>
+            <option value="1">female</option>
+            <option value="2">non-binary</option>
+            <option value="3">other</option>
+            </select> gender<br>
+            <input type="text" name="pronouns_1" id="pronouns_1" maxlength="5" pattern="[a-zA-Z0-9 ]*" /> / <input type="text" name="pronouns_2" id="pronouns_2" maxlength="5" pattern="[a-zA-Z0-9 ]*" /> pronouns<br>
+            <input type="password" name="password" id="password" maxlength="30" /> password<br>
+            <input type="submit" value="Sign in" id="btn_add" /> submit<br>
+        </form>
+        
+    </body>
+</html>

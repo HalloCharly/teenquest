@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]>      <html class="no-js"> <!--<![endif]-->
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title>create</title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="">
+    </head>
+    <body>
+        <!--[if lt IE 7]>
+            <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="#">upgrade your browser</a> to improve your experience.</p>
+        <![endif]-->
+        
+        <form action="/jobmaker/create" method="POST">
+            <input type="text" name="job_type" id="job_type" maxlength="30"/> job_type<br>
+            <input type="datetime-local" name="job_scheduled_start" id="job_scheduled_start" /> job_scheduled_start<br>
+            <input type="datetime-local" name="job_scheduled_end" id="job_scheduled_end" /> job_scheduled_end<br>
+            <input type="text" name="country" id="country" maxlength="2" /> country | put 2 letter only here <br>
+            <input type="text" name="city" id="city" maxlength="200" /> city <br>
+            <input type="text" name="zip_code" id="zip_code" maxlength="20" /> zip_code <br>
+            <input type="text" name="street" id="street" maxlength="200" /> street <br>
+            <input type="text" name="job_title" id="job_title" maxlength="50" /> job_title <br>
+            <input type="text" name="job_description" id="job_description" maxlength="500" /> job_description <br>
+            <input type="text" name="job_salary" id="job_salary" maxlength="10" /> job_salary <br>
+            <input type="submit" value="Sign in" id="btn_add" /> submit<br>
+        </form>
+        <form action="/jobmaker/confirm" method="POST">
+            <input type="text" name="job_id" id="job_id" maxlength="3"/> job_id<br>
+            <select name="state" id="state">
+            <option value="2">accept_maker</option>
+            <option value="5">pay</option>
+            </select> state_confirmation<br>
+            <input type="submit" value="Sign in" id="btn_add" /> submit<br>
+        </form>
+        <form action="/jobmaker/edit" method="POST">
+            <input type="text" name="job_id" id="job_id" maxlength="3"/> job_id<br>
+            <input type="text" name="job_type" id="job_type" maxlength="30"/> job_type<br>
+            <input type="datetime-local" name="job_scheduled_start" id="job_scheduled_start" /> job_scheduled_start<br>
+            <input type="datetime-local" name="job_scheduled_end" id="job_scheduled_end" /> job_scheduled_end<br>
+            <input type="text" name="country" id="country" maxlength="2" /> country | put 2 letter only here <br>
+            <input type="text" name="city" id="city" maxlength="200" /> city <br>
+            <input type="text" name="zip_code" id="zip_code" maxlength="20" /> zip_code <br>
+            <input type="text" name="street" id="street" maxlength="200" /> street <br>
+            <input type="text" name="job_title" id="job_title" maxlength="50" /> job_title <br>
+            <input type="text" name="job_description" id="job_description" maxlength="500" /> job_description <br>
+            <input type="text" name="job_salary" id="job_salary" maxlength="10" /> job_salary <br>
+            <input type="submit" value="Sign in" id="btn_add" /> submit<br>
+        </form>
+        
+    </body>
+</html>

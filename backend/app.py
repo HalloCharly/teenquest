@@ -17,13 +17,13 @@ from jobs import Job
 #main app file
 
 #App
-app = Flask(__name__)
+app = Flask(__name__, template_folder='../test_html/')
 
 app.secret_key = "epstein grape chiggers"#todo:move into cfg file
 
 login_manager.init_app(app)
 
-#Db setup
+#Db setupa
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///jobs.db"
 app.config["SQLALCHEMY_BINDS"] = {
     "jobtakers": "sqlite:///users.db",
