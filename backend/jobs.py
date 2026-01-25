@@ -1,13 +1,13 @@
 #Imports
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Tuple
 from flask import Flask, session
 import passwords
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker, Session, Query
 import global_objects
 from global_objects import db, JobState
 from sqlalchemy_utils import CountryType, Country
-from decimal import Decimal, getcontext, localcontext
+from decimal import Decimal
 from users import get_user_by_id
 
 #handles password checking, hashing, and password db operations(add, edit, delete)
@@ -21,7 +21,7 @@ def init_module(application):
         global app
         app = application
         global sessionmaker_job
-        sessionmaker_job = sessionmaker(bind=db.engines["jobs"])
+        sessionmaker_job = sessionmaker(bind=db.engines[global_objects.JOBS_BINDKEY])
         global_objects.job_type = Job
 
 class Job(db.Model):
@@ -29,6 +29,7 @@ class Job(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     jobtaker_id = db.Column(db.Integer, nullable=True)
     jobmaker_id = db.Column(db.Integer, nullable=False)
+    jobmaker_rating = db.Column(db.Integer, nullable=True)
     job_state = db.Column(db.Enum(JobState), default=JobState.CREATED, nullable=False)
     date_time_created = db.Column(db.DateTime, default=datetime.now(timezone.utc).astimezone(), nullable=False)
     date_time_accepted_taker = db.Column(db.DateTime, nullable=True)
@@ -47,8 +48,9 @@ class Job(db.Model):
     job_description = db.Column(db.String(500), nullable=False)
     job_salary = db.Column(db.Float(asdecimal=True), nullable=False)
     
-    def __init__(self, jobmaker_id, job_type, date_time_scheduled_start, date_time_scheduled_end, country, city, zip_code, street, job_title, job_description, job_salary):
+    def __init__(self, jobmaker_id, jobmaker_rating, job_type, date_time_scheduled_start, date_time_scheduled_end, country, city, zip_code, street, job_title, job_description, job_salary):
         self.jobmaker_id = jobmaker_id
+        self.jobmaker_rating = jobmaker_rating
         self.job_type = job_type
         self.date_time_scheduled_start = date_time_scheduled_start
         self.date_time_scheduled_end = date_time_scheduled_end
@@ -59,14 +61,115 @@ class Job(db.Model):
         self.job_title = job_title
         self.job_description = job_description
         self.job_salary = job_salary
-        
+    
     def __repr__(self) -> str:
         return f"""Job{'\n'}{self.id}{'\n'}{self.jobtaker_id}{'\n'}{self.jobmaker_id}{'\n'}{self.job_state}{'\n'}{self.date_time_created}{'\n'}{self.date_time_accepted_taker}{'\n'}
         {self.date_time_accepted_maker}{'\n'}{self.date_time_started}{'\n'}{self.date_time_ended}{'\n'}{self.date_time_payed}{'\n'}{self.job_type}{'\n'}{self.date_time_scheduled_start}{'\n'}
         {self.date_time_scheduled_end}{'\n'}{self.country}, {self.city}, {self.street}, {self.zip_code}{'\n'}{self.job_title}{'\n'}{self.job_description}{'\n'}, {self.job_salary}{'\n'}"""
 
-def get_all_jobtaker_jobs(user) -> List[Job] | None:
-    #gets all jobs assigned to a jobtaker
+    def edit_job(self, request, db_session=None) -> bool:
+        #validates and changes user accessible job data from a user request if job isn't locked
+        if not validate_job_request(request):
+            return False
+        if self != global_objects.admin:
+            return False
+        if db_session == None:
+            db_session : Session = sessionmaker_job()
+            db_session.begin()
+        if self.job_state.value >= JobState.ACCEPTED_MAKER.value:#if job_state is alr accepted, block job editing
+            return False
+        self.job_type = request.form['job_type']
+        self.date_time_scheduled_start = datetime.strptime(request.form['job_scheduled_start'], "%Y-%m-%dT%H:%M")
+        self.date_time_scheduled_end = datetime.strptime(request.form['job_scheduled_end'], "%Y-%m-%dT%H:%M")
+        self.country = Country(request.form['country'])
+        self.city = request.form['city']
+        self.zip_code = request.form['zip_code']
+        self.street = request.form['street']
+        self.job_title = request.form['job_title']
+        self.job_description = request.form['job_description']
+        self.job_salary = Decimal(request.form['job_salary'])
+        db_session.commit()
+        return True
+    
+    def deny_jobtaker_job_state(self, db_session : Session | None = None):
+        if self.job_state != global_objects.JobState.ACCEPTED_TAKER:
+            return False
+        if db_session == None:
+            db_session : Session = sessionmaker_job()
+            db_session.begin()
+        self.job_state = JobState.CREATED
+        self.jobtaker_id = None
+        self.date_time_accepted_taker = None
+        db_session.commit()
+        
+    def progress_job_state(self, job_state, rating : int | None = None, jobtaker_id : int | None = None, db_session : Session | None = None) -> bool:
+        #"progresses" job forward (reffer to chart)
+        if db_session == None:
+            db_session : Session = sessionmaker_job()
+            db_session.begin()
+        if job_state.value - 1 != self.job_state.value:
+            return False
+        match job_state:
+            case JobState.CREATED:
+                self.date_time_created = datetime.now(timezone.utc).astimezone()
+            case JobState.ACCEPTED_TAKER:
+                if jobtaker_id == None:
+                    print("Failed to provide jobtaker_id to jobstate progressor")
+                    return False
+                self.jobtaker_id = jobtaker_id
+                self.date_time_accepted_taker = datetime.now(timezone.utc).astimezone()
+            case JobState.ACCEPTED_MAKER:
+                self.date_time_accepted_maker = datetime.now(timezone.utc).astimezone()
+            case JobState.STARTED:
+                self.date_time_started = datetime.now(timezone.utc).astimezone()
+            case JobState.ENDED:
+                if rating == None:
+                    print("Failed to provide rating to jobstate progressor")
+                    return False
+                self.date_time_ended = datetime.now(timezone.utc).astimezone()
+                search = get_user_by_id(self.jobmaker_id, False)
+                if search == None:
+                    return False
+                (user_session, user_query) = search
+                user_query.first().change_rating(rating)
+                user_session.commit()
+            case JobState.PAYED:
+                if rating == None:
+                    print("Failed to provide rating to jobstate progressor")
+                    return False
+                self.date_time_payed = datetime.now(timezone.utc).astimezone()
+                db_session.flush()
+                query = db_session.query(Job).filter(Job.job_state == JobState.PAYED)
+                if query.count() > 5:
+                    query.order_by(Job.date_time_payed).limit(query.count()-5).delete()
+                search = get_user_by_id(self.jobtaker_id, True)
+                if search == None:
+                    return False
+                (jobtaker_session, jobtaker_query) = search
+                jobtaker_query.first().change_rating(rating, jobtaker_session)
+                jobtaker_query.first().increment_job_ammount_done(jobtaker_session)
+                jobtaker_session.commit()
+                search = get_user_by_id(self.jobmaker_id, False)
+                if search == None:
+                    return False
+                (jobmaker_session, jobmaker_query) = search
+                jobmaker_query.first().increment_job_ammount_done(jobmaker_session)
+                jobmaker_session.commit()
+        self.job_state = job_state
+        db_session.commit()
+        return True
+
+    def delete_job(self, db_session=None) -> bool:
+        #deletes job if it isn't locked
+        if db_session == None:
+            db_session = sessionmaker_job()
+            db_session.begin()
+        db_session.delete(self)
+        db_session.commit()
+        return True
+
+def get_all_jobtaker_jobs(user) -> Tuple[Session, Query[Job]] | None:
+    #returns a session and query with all of a jobtaker's jobs
     if not isinstance(user, global_objects.jobtaker_type):
         return None
     db_session : Session = sessionmaker_job()
@@ -75,10 +178,10 @@ def get_all_jobtaker_jobs(user) -> List[Job] | None:
     if query.count() == 0:
         return None
     else:
-        return query.all()
+        return (db_session, query)
     
-def get_all_jobmaker_jobs(user) -> List[Job] | None:
-    #gets all jobs assigned to a jobmaker
+def get_all_jobmaker_jobs(user) -> Tuple[Session, Query[Job]] | None:
+    #returns a session and query with all of a jobmaker's jobs
     if not isinstance(user, global_objects.jobmaker_type):
         return None
     db_session : Session = sessionmaker_job()
@@ -87,111 +190,43 @@ def get_all_jobmaker_jobs(user) -> List[Job] | None:
     if query.count() == 0:
         return None
     else:
-        return query.all()
+        return (db_session, query)
 
-def get_job_by_id(job_id) -> Job | None:
+def get_job_by_id(job_id) -> Tuple[Session, Query[Job]] | None:
     #gets job from db by id
     db_session : Session = sessionmaker_job()
     db_session.begin()
     query = db_session.query(Job).filter(Job.id == job_id)
     if query.count() != 1:
         return None
-    return query.first()
+    return (db_session, query)
 
 def create_job(user, request) -> bool:
     #validates and creates a job from a user request
     if not validate_job_request(request):
         return False
-    if user != global_objects.admin and get_user_by_id(user.id, False) != user:
+    search = get_user_by_id(user.id, False)
+    if search == None:
+        return False
+    if user != global_objects.admin and search[1].first() != user:
         return False
     job = Job(user.id, request.form['job_type'], datetime.strptime(request.form['job_scheduled_start'], "%Y-%m-%dT%H:%M"),
             datetime.strptime(request.form['job_scheduled_end'], "%Y-%m-%dT%H:%M"), Country(request.form['country']), request.form['city'], request.form['zip_code'], request.form['street'], request.form['job_title'],
             request.form['job_description'], Decimal(request.form['job_salary']))
-    return add_job_to_db(job)
-    
-
-def add_job_to_db(job : Job) -> bool:
-    #add a job to the jobs db
     db_session : Session = sessionmaker_job()
     db_session.begin()
     db_session.add(job)
     db_session.commit()
     return True
 
-def update_job_state(job_id, job_state) -> bool:
-    #"progresses" job forward (reffer to chart)
-    db_session : Session = sessionmaker_job()
-    db_session.begin()
-    query = db_session.query(Job).filter(Job.id == job_id)
-    if query.count() != 1:
-        return False
-    if(job_state.value - 1 != query.first().job_state.value):
-        return False
-    match(job_state):
-        case JobState.CREATED:
-            query.update({Job.job_state : job_state, Job.date_time_created : datetime.now(timezone.utc).astimezone()})
-        case JobState.ACCEPTED_TAKER:
-            query.update({Job.job_state : job_state, Job.date_time_accepted_taker : datetime.now(timezone.utc).astimezone()})
-        case JobState.ACCEPTED_MAKER:
-            query.update({Job.job_state : job_state, Job.date_time_accepted_maker : datetime.now(timezone.utc).astimezone()})
-        case JobState.STARTED:
-            query.update({Job.job_state : job_state, Job.date_time_started : datetime.now(timezone.utc).astimezone()})
-        case JobState.ENDED:
-            query.update({Job.job_state : job_state, Job.date_time_ended : datetime.now(timezone.utc).astimezone()})
-        case JobState.PAYED:
-            query.update({Job.job_state : job_state, Job.date_time_payed : datetime.now(timezone.utc).astimezone()})
-            db_session.flush()
-            query = db_session.query(Job).filter(Job.job_state == JobState.PAYED)
-            if query.count() > 5:
-                query.order_by(Job.date_time_payed).limit(query.count()-5).delete()
-    db_session.commit()
-    return True
 
-def edit_job(user, request) -> bool:
-    #validates and changes user accessible job data from a user request if job isn't locked
-    if not validate_job_request(request):
+def update_jobs_ratings(user) -> bool:
+    #gets all jobs belonging to a user and updates their ratings to the user's rating
+    jobs = get_all_jobmaker_jobs(user)
+    if jobs == None:
         return False
-    if user != global_objects.admin and get_user_by_id(user.id, False) != user:
-        return False
-    job_id = None
-    try:
-        job_id = int(request.form['job_id'])
-    except TypeError as e:
-        print(e)
-        return False
-    db_session : Session = sessionmaker_job()
-    db_session.begin()
-    query = db_session.query(Job).filter(Job.id == job_id)
-    if query.count() != 1:
-        return False
-    job = query.first()
-    if job.job_state.value > JobState.ACCEPTED_MAKER.value:#if job_state is alr accepted, block job editing
-        return False
-    query.update({
-        Job.job_type : request.form['job_type'],
-        Job.date_time_scheduled_start : datetime.strptime(request.form['job_scheduled_start'], "%Y-%m-%dT%H:%M"),
-        Job.date_time_scheduled_end : datetime.strptime(request.form['job_scheduled_end'], "%Y-%m-%dT%H:%M"),
-        Job.country : Country(request.form['country']),
-        Job.city : request.form['city'],
-        Job.zip_code : request.form['zip_code'],
-        Job.street : request.form['street'],
-        Job.job_title : request.form['job_title'],
-        Job.job_description : request.form['job_description'],
-        Job.job_salary : Decimal(request.form['job_salary'])
-    })
-    db_session.commit()
-    return True
-
-def delete_job(job_id : Job) -> bool:
-    #deletes job if it isn't locked
-    job = get_job_by_id(job_id)
-    if job == None or job.job_state.value > JobState.ACCEPTED_MAKER.value:#if job_state is alr accepted, block job deletion
-        return False
-    db_session : Session = sessionmaker_job()
-    db_session.begin()
-    query = db_session.query(Job).filter(Job.id == job.id)
-    if query.count() > 0:
-        query.delete()
+    (db_session, query) = jobs
+    query.update({Job.jobmaker_rating : user.rating})
     db_session.commit()
     return True
 
@@ -220,4 +255,6 @@ def validate_job_request(request) -> bool:
     except Exception as e:
         return handle_error(e)
     return True
-    
+
+def get_filtered_jobs():
+    return None

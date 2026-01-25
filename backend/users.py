@@ -1,14 +1,14 @@
 #Imports
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Tuple
-from flask import Flask, session
+from typing import Any, Tuple
+from flask import Flask, session, Request
 import passwords
 import phonenumbers
 from phonenumbers import NumberParseException, PhoneNumber, PhoneNumberFormat
 from email_validator import EmailNotValidError, EmailSyntaxError, validate_email 
 from flask_login import UserMixin, login_user, current_user
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker, Session, Query
 import global_objects
 from global_objects import db, login_manager, Gender
 from sqlalchemy_utils import EmailType, CountryType, PhoneNumberType, Country
@@ -24,9 +24,9 @@ def init_module(application):
         global app
         app = application
         global sessionmaker_jobtaker
-        sessionmaker_jobtaker = sessionmaker(bind=db.engines['jobtakers'])
+        sessionmaker_jobtaker = sessionmaker(bind=db.engines[global_objects.JOBTAKERS_BINDKEY])
         global sessionmaker_jobmaker
-        sessionmaker_jobmaker = sessionmaker(bind=db.engines['jobmakers'])
+        sessionmaker_jobmaker = sessionmaker(bind=db.engines[global_objects.JOBMAKERS_BINDKEY])
         global_objects.make_admin_object(Admin)
         global_objects.jobtaker_type = JobTaker
         global_objects.jobmaker_type = JobMaker
@@ -44,11 +44,11 @@ def user_model_factory(bind_key, _roles):
         country = db.Column(CountryType, nullable=False)
         birth_date = db.Column(db.DateTime, default=datetime.min, nullable=False)
         date_time_created = db.Column(db.DateTime, default=datetime.now(timezone.utc).astimezone(), nullable=False)
-        rating = db.Column(db.Integer, nullable=True)
+        rating_avg = db.Column(db.Integer, nullable=True)
+        rating_count = db.Column(db.Integer, nullable=True)
         gender = db.Column(db.Enum(Gender), nullable=False)
         pronouns = db.Column(db.String(11), nullable=False)
-        job_ammount_started = db.Column(db.Integer, default=0, nullable=False)
-        job_ammount_finished = db.Column(db.Integer, default=0, nullable=False)
+        job_ammount_done = db.Column(db.Integer, default=0, nullable=False)
         roles = _roles
     
         def __init__(self, first_name, last_name, email, phone_number, country, birth_date, gender, pronouns):
@@ -63,12 +63,106 @@ def user_model_factory(bind_key, _roles):
 
         def __repr__(self) -> str:
             return f"""User{'\n'}{self.id}{'\n'}{self.first_name}{'\n'}{self.last_name}{'\n'}{self.email}{'\n'}{self.phone_number}{'\n'}{self.country}{'\n'}
-        {self.birth_date}{'\n'}{self.date_time_created}{'\n'}{self.rating}{'\n'}{self.job_ammount_started}{'\n'}{self.job_ammount_finished}{'\n'}{self.gender}{'\n'}{self.pronouns}{'\n'}"""
+        {self.birth_date}{'\n'}{self.date_time_created}{'\n'}{self.rating_avg}{'\n'}{self.job_ammount_done}{'\n'}{self.gender}{'\n'}{self.pronouns}{'\n'}"""
+        
+        def change_rating(self, rating : int, db_session : Session | None = None) -> bool:
+            if self == global_objects.admin:
+                return False
+            if db_session == None:
+                db_session = get_user_session(self.__bind_key__ == global_objects.JOBTAKERS_BINDKEY)
+                db_session.begin()
+            self.rating_avg = int(((float(self.rating_avg) * self.rating_count) + rating) / (self.rating_count + 1))
+            self.rating_count += 1
+            db_session.commit()
+            return True
+        
+        def increment_job_ammount_done(self, db_session : Session | None = None) -> bool:
+            if self == global_objects.admin:
+                return False
+            if db_session == None:
+                db_session = get_user_session(self.__bind_key__ == global_objects.JOBTAKERS_BINDKEY)
+                db_session.begin()
+            self.job_ammount_done += 1
+            db_session.commit()
+            return True
+            
+        def edit_account(self, request : Request, db_session : Session | None = None) -> bool:#request.form should contain account data minus email and an old and new password
+            #validates and changes user accesible data by a user request
+            if self == global_objects.admin:
+                return False
+            def handle_error(e):
+                print(e)
+                return False
+            try:
+                phone_number = phonenumbers.parse(request.form['phone_num'])
+                if(not phonenumbers.is_valid_number(phone_number)):
+                    return handle_error("Invalid phone number")
+            except NumberParseException as e:
+                return handle_error(e)
+            try:
+                country = Country(request.form['country'])
+            except ValueError as e:
+                return handle_error(e)
+            try:
+                birthdate = datetime.strptime(request.form['birthdate'], "%Y-%m-%d").date()
+            except ValueError as e:
+                return handle_error(e)
+            try:
+                gender = Gender(int(request.form['gender']))
+            except:
+                return handle_error(e)
+            if db_session == None:
+                db_session = get_user_session(self.__bind_key__ == global_objects.JOBTAKERS_BINDKEY)
+                db_session.begin()
+            user_type = get_user_type(self.__bind_key__ == global_objects.JOBTAKERS_BINDKEY)
+            db_session.query(user_type).filter(user_type.id == self.id).update({
+                user_type.first_name : request.form['first_name'],
+                user_type.last_name : request.form['last_name'],
+                user_type.phone_number : phonenumbers.format_number(phone_number, PhoneNumberFormat.E164),
+                user_type.country : country,
+                user_type.birth_date : birthdate,
+                user_type.gender : gender,
+                user_type.pronouns : f"{request.form['pronouns_1']}/{request.form['pronouns_2']}"
+            })
+            #self.first_name = request.form['first_name']
+            #self.last_name = request.form['last_name']
+            #self.phone_number = phonenumbers.format_number(phone_number, PhoneNumberFormat.E164)
+            #self.country = country
+            #self.birth_date = birthdate
+            #self.gender = gender
+            #self.pronouns = f"{request.form['pronouns_1']}/{request.form['pronouns_2']}"
+            db_session.flush()
+            search = passwords.get_password_by_id(self.id, self.__bind_key__ == global_objects.JOBTAKERS_BINDKEY)
+            if(search == None):
+                return False
+            (password_session, query) = search
+            if not query.first().edit_password(request.form['password'], password_session):
+                return False
+            db_session.commit()
+            print(self)
+            return True
+        
+        def delete_account(self, db_session : Session | None = None) -> bool:
+            #deletes a user account and password from the dbs
+            if self == global_objects.admin:
+                return False
+            if db_session == None:
+                db_session = get_user_session(self.__bind_key__ == global_objects.JOBTAKERS_BINDKEY)
+                db_session.begin()
+            search = passwords.get_password_by_id(self.id, self.__bind_key__ == global_objects.JOBTAKERS_BINDKEY)
+            if(search == None):
+                return False
+            (password_session, query) = search
+            if not query.first().delete_password(password_session):
+                return False
+            db_session.delete(self)
+            db_session.commit()
+            return True
         
     return DynamicUser
 
-JobTaker = user_model_factory("jobtakers", {global_objects.jobtaker_role})
-JobMaker = user_model_factory("jobmakers", {global_objects.jobmaker_role})
+JobTaker = user_model_factory(global_objects.JOBTAKERS_BINDKEY, {global_objects.jobtaker_role})
+JobMaker = user_model_factory(global_objects.JOBMAKERS_BINDKEY, {global_objects.jobmaker_role})
 Admin = user_model_factory("", {global_objects.jobtaker_role, global_objects.jobmaker_role, global_objects.admin_role})
 
 def get_user_type(is_jobtaker):
@@ -85,7 +179,7 @@ def get_user_session(is_jobtaker) -> Session:
     else:
         return sessionmaker_jobmaker()
     
-def get_user_by_id(user_id, is_jobtaker):
+def get_user_by_id(user_id, is_jobtaker) -> Tuple[Session, Query[Any]] | None:
     #gets a user by id
     if(user_id == 0):
         return global_objects.admin
@@ -95,9 +189,9 @@ def get_user_by_id(user_id, is_jobtaker):
     query = db_session.query(user_type).filter(user_type.id == user_id)
     if(query.count() != 1):
         return None
-    return query.first()
+    return (db_session, query)
 
-def get_user_by_email(email, is_jobtaker):
+def get_user_by_email(email, is_jobtaker) -> Tuple[Session, Query[Any]] | None:
     #gets user by email
     try:
         validate_email(email, check_deliverability=False)
@@ -106,16 +200,15 @@ def get_user_by_email(email, is_jobtaker):
         return None
     if email == global_objects.admin.email:
         return global_objects.admin
-    else:
-        db_session = get_user_session(is_jobtaker)
-        db_session.begin()
-        user_type = get_user_type(is_jobtaker)
-        query = db_session.query(user_type).filter(user_type.email == email)
-        if(query.count() != 1):
-            return None
-        return query.first()
+    db_session = get_user_session(is_jobtaker)
+    db_session.begin()
+    user_type = get_user_type(is_jobtaker)
+    query = db_session.query(user_type).filter(user_type.email == email)
+    if(query.count() != 1):
+        return None
+    return (db_session, query)
 
-def get_user_by_phone(phone_number, is_jobtaker):
+def get_user_by_phone(phone_number, is_jobtaker) -> Tuple[Session, Query[Any]] | None:
     #gets user by phone number
     if(not isinstance(phone_number, PhoneNumber)):
         phone_number = phonenumbers.parse(phone_number)
@@ -127,43 +220,27 @@ def get_user_by_phone(phone_number, is_jobtaker):
         return None
     if phonenumbers.format_number(phone_number, PhoneNumberFormat.E164) == global_objects.admin.email:
         return global_objects.admin
-    else:
-        db_session = get_user_session(is_jobtaker)
-        db_session.begin()
-        user_type = get_user_type(is_jobtaker)
-        query = db_session.query(user_type).filter(user_type.phone_number == phonenumbers.format_number(phone_number, PhoneNumberFormat.E164))
-        if(query.count() != 1):
-            return None
-        return query.first()
+    db_session = get_user_session(is_jobtaker)
+    db_session.begin()
+    user_type = get_user_type(is_jobtaker)
+    query = db_session.query(user_type).filter(user_type.phone_number == phonenumbers.format_number(phone_number, PhoneNumberFormat.E164))
+    if(query.count() != 1):
+        return None
+    return (db_session, query)
 
 @login_manager.user_loader
 def load_user(user_id):
     #gets a user depending on the session account type
-    if(session['account_type'] == "admin"):
+    if(session['account_type'] == global_objects.ADMIN_SESSION_NAME):
         return global_objects.admin
-    elif(session['account_type'] == "jobtaker" or session['account_type'] == "jobmaker"):
-        db_session = get_user_session(session['account_type'] == "jobtaker")
+    elif(session['account_type'] == global_objects.JOBTAKER_SESSION_NAME or session['account_type'] == global_objects.JOBMAKER_SESSION_NAME):
+        db_session = get_user_session(session['account_type'] == global_objects.JOBTAKER_SESSION_NAME)
         db_session.begin()
-        return db_session.query(get_user_type(session['account_type'] == "jobtaker")).get({"id":int(user_id)})
+        return db_session.query(get_user_type(session['account_type'] == global_objects.JOBTAKER_SESSION_NAME)).get({"id":int(user_id)})
     else:
         return None
 
-def add_user_to_db(user, is_jobtaker, force_add=False) -> Tuple[bool, int | None, Session]:
-    #add user to the db (doesn't commit it!!!!!!)
-    if user == global_objects.admin:
-        return (False, None, None)
-    db_session = get_user_session(is_jobtaker)
-    db_session.begin()
-    if get_user_by_email(user.email, is_jobtaker) != None and not force_add:
-        return (False, None, None)
-    if get_user_by_phone(user.phone_number, is_jobtaker) != None and not force_add:
-        return (False, None, None)
-    db_session.add(user)
-    db_session.flush()
-    user_id = user.id
-    return (True, user_id, db_session)
-
-def validate_user_creation_request(request) -> bool:
+def validate_user_creation_request(request : Request) -> bool:
     #checks if request.form contains parsable information
     def handle_error(e):
         print(e)
@@ -189,9 +266,11 @@ def validate_user_creation_request(request) -> bool:
     except ValueError as e:
         return handle_error(e)
     try:
-        datetime.strptime(request.form['birthdate'], "%Y-%m-%d").date()
+        date = datetime.strptime(request.form['birthdate'], "%Y-%m-%d").date()
     except ValueError as e:
         return handle_error(e)
+    if(date > datetime.now(timezone.utc).astimezone().date()):
+        return handle_error("Invalid bdate")
     try:
         Gender(int(request.form['gender']))
     except:
@@ -200,99 +279,52 @@ def validate_user_creation_request(request) -> bool:
 
 def validate_login_attempt(request, is_jobtaker) -> bool:#request.form should contain a password and an email
     #validates and compares a provided email and password /w the dbs
-    user = get_user_by_email(request.form['email'], is_jobtaker)
-    if(user == None):
+    search = get_user_by_email(request.form['email'], is_jobtaker)
+    if(search == None):
         return False
-    if not passwords.check_password_hash(user, request.form['password'], is_jobtaker):
+    (_, user_query) = search 
+    search = passwords.get_password_by_id(user_query.first().id, is_jobtaker)
+    if(search == None):
         return False
-    session['account_type'] = (lambda x : "jobtaker" if x else "jobmaker")(is_jobtaker)
-    login_user(user)
-    print("que")
-    identity_changed.send(app, identity=Identity(user.id))
-    return True
-
-def edit_account(user, request, is_jobtaker) -> Tuple[bool, int | None]:#request.form should contain (account data-email) and an old and new password
-    #validates and changes user accesible data by a user request
-    if user == global_objects.admin:
-        return (False, None)
-    if(get_user_by_email(user.email, is_jobtaker) == None or user == None):
-        print("email is not in use")
+    (_, password_query) = search 
+    if not password_query.first().check_password_hash(request.form['password']):
         return False
-    def handle_error(e):
-        print(e)
-        return False
-    try:
-        phone_number = phonenumbers.parse(request.form['phone_num'])
-        if(not phonenumbers.is_valid_number(phone_number)):
-            return handle_error("griker")
-    except NumberParseException as e:
-        return handle_error(e)
-    try:
-        country = Country(request.form['country'])
-    except ValueError as e:
-        return handle_error(e)
-    try:
-        birthdate = datetime.strptime(request.form['birthdate'], "%Y-%m-%d").date()
-    except ValueError as e:
-        return handle_error(e)
-    try:
-        gender = Gender(int(request.form['gender']))
-    except:
-        return handle_error(e)
-    user_type = get_user_type(is_jobtaker)
-    db_session = get_user_session(is_jobtaker)
-    db_session.begin()
-    db_session.query(user_type).filter(user_type.id==user.id).update({
-        user_type.first_name: request.form['first_name'],
-        user_type.last_name: request.form['last_name'],
-        user_type.phone_number: phonenumbers.format_number(phone_number, PhoneNumberFormat.E164),
-        user_type.country: country,
-        user_type.birth_date: birthdate,
-        user_type.gender: gender,
-        user_type.pronouns: f"{request.form['pronouns_1']}/{request.form['pronouns_2']}"
-    })
-    if not passwords.edit_password(user.id, request.form['password'], is_jobtaker):
-        return False
-    db_session.commit()
+    session['account_type'] = (lambda x : global_objects.JOBTAKER_SESSION_NAME if x else global_objects.JOBMAKER_SESSION_NAME)(is_jobtaker)
+    login_user(user_query.first())
+    identity_changed.send(app, identity=Identity(user_query.first().id))
     return True
 
 def create_account(request, is_jobtaker) -> bool:#request.form should contain account data and a password
     #validates, creates and adds a user+psswrd to the dbs from a user request
-    if not validate_user_creation_request(request, is_jobtaker):
+    
+    #acc creation takes a while cuz we need to verify email deliverability
+    if not validate_user_creation_request(request):
         return False
     email = validate_email(request.form['email'], check_deliverability=True).normalized
     phone_number = phonenumbers.parse(request.form['phone_num'])
-    if(get_user_by_email(email, is_jobtaker) != None):
+    if get_user_by_email(email, is_jobtaker) != None:
         print("email already in use")
         return False
-    if(get_user_by_phone(phone_number, is_jobtaker) != None):
+    if get_user_by_phone(phone_number, is_jobtaker) != None:
         print("phone already in use")
         return False
     user = get_user_type(is_jobtaker)(request.form['first_name'], request.form['last_name'], email, phonenumbers.format_number(phone_number, PhoneNumberFormat.E164), Country(request.form['country']), datetime.strptime(request.form['birthdate'], "%Y-%m-%d").date(), Gender(int(request.form['gender'])), f"{request.form['pronouns_1']}/{request.form['pronouns_2']}")
     #add password to db
-    (code, user_id, user_session) = add_user_to_db(user, is_jobtaker)
-    if not code:
+    if user == global_objects.admin:
         return False
-    code = passwords.add_user_password_to_db(user_id, request.form['password'], is_jobtaker)
-    if not code:
+    user_session = get_user_session(is_jobtaker)
+    user_session.begin()
+    if get_user_by_email(user.email, is_jobtaker) != None:
         return False
-    user_session.commit()#we commit it after adding the password, to avoid desync
-    session['account_type'] = (lambda x : "jobtaker" if x else "jobmaker")(is_jobtaker)
-    return True
-
-def delete_account(user, session_type) -> bool:
-    #deletes a user account
-    if user == global_objects.admin or session_type == "admin":
+    if get_user_by_phone(user.phone_number, is_jobtaker) != None:
         return False
-    if session_type != "jobtaker" and session_type != "jobmaker":
+    user_session.add(user)
+    user_session.flush()
+    user_id = user.id
+    if not passwords.add_user_password_to_db(user_id, request.form['password'], is_jobtaker):
         return False
-    user_type = get_user_type(session_type == "jobtaker")
-    db_session = get_user_session(session_type == "jobtaker")
-    db_session.begin()
-    query = db_session.query(user_type).filter(user_type.id == user.id).limit(1)
-    passwords.delete_password(query.first().id, session_type)
-    query.delete()
-    db_session.commit()
+    user_session.commit()#we commit it after adding the password, to avoid desync in case of failure to commit password
+    session['account_type'] = (lambda x : global_objects.JOBTAKER_SESSION_NAME if x else global_objects.JOBMAKER_SESSION_NAME)(is_jobtaker)
     return True
 
 def on_identity_loaded(sender, identity):
@@ -307,8 +339,8 @@ def on_identity_loaded(sender, identity):
 
 def validate_admin_login(password) -> bool:
     #checks admin login from user request
-    if(passwords.check_password_hash(global_objects.admin, password, False)):
-        session['account_type'] = "admin"
+    if(global_objects.admin_password.check_password_hash(password)):
+        session['account_type'] = global_objects.ADMIN_SESSION_NAME
         login_user(global_objects.admin)
         identity_changed.send(app, identity=Identity(global_objects.admin.id))
         return True

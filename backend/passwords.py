@@ -2,9 +2,10 @@
 from secrets import choice
 import string
 from hashlib import sha3_256
+from typing import Any, Tuple
 from flask import Flask
 from flask_login import UserMixin
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker, Session, Query
 import global_objects
 from global_objects import db
 
@@ -19,32 +20,58 @@ def init_module(application):
         sessionmaker_jobtakerpassword = sessionmaker(bind=db.engines['jobtaker_passwords'])
         global sessionmaker_jobmakerpassword
         sessionmaker_jobmakerpassword = sessionmaker(bind=db.engines['jobmaker_passwords'])
+        global_objects.make_admin_password_object(AdminPassword)
         global_objects.jobtaker_password_type = JobTakerPassword
         global_objects.jobmaker_password_type = JobMakerPassword
-
-admin_password_hash = "c31083adbb87e2490499a657d7f790dbfa7571f5f639b64c1e6ce44d7f06c4d2"#todo:move into cfg file or smwhere idk
 
 def password_model_factory(bind_key):
     #creates a password class/db model
     class DynamicPassword(db.Model, UserMixin):
         __bind_key__ = bind_key
         __tablename__ = bind_key
-        user_id = db.Column(db.Integer, primary_key=True, autoincrement=False)
+        id = db.Column(db.Integer, primary_key=True, autoincrement=False)
         password_hash = db.Column(db.String, nullable=False)
         salt = db.Column(db.String(16), nullable=False)
     
         def __init__(self, user_id, password_hash, salt):
-            self.user_id = user_id
+            self.id = user_id
             self.password_hash = password_hash
             self.salt = salt
 
         def __repr__(self) -> str:
-            return f"""Password{'\n'}{self.user_id}{'\n'}{self.password_hash}{'\n'}{self.salt}{'\n'}"""
+            return f"""Password{'\n'}{self.id}{'\n'}{self.password_hash}{'\n'}{self.salt}{'\n'}"""
 
+
+        def check_password_hash(self, password) -> bool:
+            #salts and hashes a password from a user request and compares it with the hash in the db
+                return generate_password_hash(password, self.salt) == self.password_hash
+        
+        def edit_password(self, password, db_session=None) -> bool:
+            #changes a user's password hash present in the passwords db
+            if self == global_objects.admin_password:
+                return False
+            if(db_session == None):
+                db_session = get_password_session(self.__bind_key__ == global_objects.JOBTAKER_PASSWORDS_BINDKEY)
+                db_session.begin()
+            self.password_hash = generate_password_hash(password, self.salt)
+            db_session.commit()
+            return True
+            
+        def delete_password(self, db_session=None) -> bool:
+            #deletes a user password from passwords db
+            if self == global_objects.admin_password:
+                return False
+            if(db_session == None):
+                db_session = get_password_session(self.__bind_key__ == global_objects.JOBTAKER_PASSWORDS_BINDKEY)
+                db_session.begin()
+            db_session.delete(self)
+            db_session.commit()
+            return True
     return DynamicPassword
 
-JobTakerPassword = password_model_factory("jobtaker_passwords")
-JobMakerPassword = password_model_factory("jobmaker_passwords")
+JobTakerPassword = password_model_factory(global_objects.JOBTAKER_PASSWORDS_BINDKEY)
+JobMakerPassword = password_model_factory(global_objects.JOBMAKER_PASSWORDS_BINDKEY)
+AdminPassword = password_model_factory("_")
 
 def get_password_type(is_jobtaker):
     #returns the password type for jobtakers or jobmakers
@@ -60,32 +87,18 @@ def get_password_session(is_jobtaker) -> Session:
     else:
         return sessionmaker_jobmakerpassword()
 
-def get_password_by_id(user_id, is_jobtaker):
+def get_password_by_id(user_id, is_jobtaker) -> Tuple[Session, Query[Any]] | Any | None:
     #gets the password for a user id
-    if user_id == 0:
-        return admin_password_hash
+    if user_id == global_objects.admin.id:
+        return global_objects.admin_password
     else:
         db_session = get_password_session(is_jobtaker)
         db_session.begin()
         user_type = get_password_type(is_jobtaker)
-        query = db_session.query(user_type).filter(user_type.user_id == user_id)
+        query = db_session.query(user_type).filter(user_type.id == user_id)
         if query.count() != 1:
             return None
-        return query.first()
-
-def check_password_hash(user, password, is_jobtaker) -> bool:
-    #salts and hashes a password from a user request and compares it with the hash in the db
-    if user == global_objects.admin:#admin check
-        return generate_password_hash(password, "") == admin_password_hash
-    else:
-        db_session = get_password_session(is_jobtaker)
-        db_session.begin()
-        user_type = get_password_type(is_jobtaker)
-        query = db_session.query(user_type).filter(user_type.user_id == user.id)
-        if query.count() != 1:
-            return False
-        return generate_password_hash(password, query.first().salt) == query.first().password_hash
-
+        return (db_session, query)
 def generate_salt(char_ammount=16) -> str:
     #creates a random salt for a user
     chars = string.ascii_letters + string.digits
@@ -97,31 +110,6 @@ def generate_password_hash(password, salt) -> str:
     hash.update((password + salt).encode('utf-8'))
     return hash.hexdigest()
 
-def edit_password(user_id, password, is_jobtaker) -> bool:
-    #changes a user's password hash present in the passwords db
-    password_type = get_password_type(is_jobtaker)
-    db_session = get_password_session(is_jobtaker)
-    db_session.begin()
-    query = db_session.query(password_type).filter(password_type.user_id==user_id)
-    query.update({
-        password_type.password_hash: generate_password_hash(password, query.first().salt)
-    })
-    db_session.commit()
-    return True
-    
-def delete_password(user_id, session_type) -> bool:
-    #deletes a user password from passwords db
-    if user_id == global_objects.admin.id or session_type == "admin":
-        return False
-    if session_type != "jobtaker" and session_type != "jobmaker":
-        return False
-    password_type = get_password_type(session_type == "jobtaker")
-    db_session = get_password_session(session_type == "jobtaker")
-    db_session.begin()
-    db_session.query().filter(password_type.user_id == user_id).limit(1).delete()
-    db_session.commit()
-    return True
-
 def add_user_password_to_db(user_id, password, is_jobtaker, force_add=False) -> bool:
     #add a password to the passwords db
     db_session = get_password_session(is_jobtaker)
@@ -129,6 +117,6 @@ def add_user_password_to_db(user_id, password, is_jobtaker, force_add=False) -> 
     if get_password_by_id(user_id, is_jobtaker) != None and not force_add:
         return False
     salt = generate_salt()
-    db_session(get_password_type(is_jobtaker)(user_id, generate_password_hash(password, salt), salt))
+    db_session.add(get_password_type(is_jobtaker)(user_id, generate_password_hash(password, salt), salt))
     db_session.commit()
     return True
