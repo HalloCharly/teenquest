@@ -248,7 +248,6 @@ def jobmarket_jobtaker_confirm():
         case _:
             print("cant do dat")
             return render_template("take_job.html")
-    db_session.commit()
     return render_template("take_job.html")
 
 @app.route("/jobtaker/jobmarket/unconfirm", methods=["POST"])
@@ -265,7 +264,6 @@ def jobmarket_jobtaker_unconfirm():
         return render_template("take_job.html")
     (db_session, query) = search
     query.first().deny_jobtaker_job_state(db_session)
-    db_session.commit()
     return render_template("take_job.html")
 
 
@@ -314,7 +312,6 @@ def jobmarket_jobmaker_confirm():
         case _:
             print("cant do dat")
             return render_template("make_job.html")
-    db_session.commit()
     return render_template("make_job.html")
 
 @app.route("/jobmaker/jobmarket/edit", methods=["POST"])
@@ -330,14 +327,13 @@ def jobmarket_jobmaker_edit():
         print("bad id")
         return render_template("make_job.html")
     (db_session, query) = search
-    print(query.first().edit_job(request, db_session))
-    db_session.commit()
+    query.first().edit_job(request, db_session)
     return render_template("make_job.html")
 
-@app.route("/jobmaker/jobmarket/fry_jobtaker", methods=["POST"])
+@app.route("/jobmaker/jobmarket/deny_jobtaker", methods=["POST"])
 @jobmaker_permission.require(http_exception=401)
 @login_required
-def jobmarket_jobmaker_fry_jobtaker():
+def jobmarket_jobmaker_deny_jobtaker():
     try:
         search = jobs.get_job_by_id(int(request.form['job_id']))
     except ValueError as e:
@@ -348,7 +344,6 @@ def jobmarket_jobmaker_fry_jobtaker():
         return render_template("make_job.html")
     (db_session, query) = search
     query.first().deny_jobtaker_job_state(db_session)
-    db_session.commit()
     return render_template("make_job.html")
 
 @app.route("/jobmaker/jobmarket/delete", methods=["POST"])
@@ -365,7 +360,6 @@ def jobmarket_jobmaker_delete_job():
         return render_template("make_job.html")
     (db_session, query) = search
     query.first().delete_job(db_session)
-    db_session.commit()
     return render_template("make_job.html")
 
 

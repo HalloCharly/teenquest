@@ -42,6 +42,7 @@ def user_model_factory(bind_key, _roles):
         email = db.Column(EmailType, nullable=False, unique=True)
         phone_number = db.Column(PhoneNumberType, nullable=False, unique=True)
         country = db.Column(CountryType, nullable=False)
+        city = db.Column(db.String(40), nullable=False)
         birth_date = db.Column(db.DateTime, default=datetime.min, nullable=False)
         date_time_created = db.Column(db.DateTime, default=datetime.now(timezone.utc).astimezone(), nullable=False)
         rating_avg = db.Column(db.Integer, nullable=True)
@@ -51,21 +52,22 @@ def user_model_factory(bind_key, _roles):
         job_ammount_done = db.Column(db.Integer, default=0, nullable=False)
         roles = _roles
     
-        def __init__(self, first_name, last_name, email, phone_number, country, birth_date, gender, pronouns):
+        def __init__(self, first_name, last_name, email, phone_number, country, city, birth_date, gender, pronouns):
             self.first_name = first_name
             self.last_name = last_name
             self.email = email
             self.phone_number = phone_number
             self.country = country
+            self.city = city
             self.birth_date = birth_date
             self.gender = gender
             self.pronouns = pronouns
 
         def __repr__(self) -> str:
-            return f"""User{'\n'}{self.id}{'\n'}{self.first_name}{'\n'}{self.last_name}{'\n'}{self.email}{'\n'}{self.phone_number}{'\n'}{self.country}{'\n'}
+            return f"""User{'\n'}{self.id}{'\n'}{self.first_name}{'\n'}{self.last_name}{'\n'}{self.email}{'\n'}{self.phone_number}{'\n'}{self.country}{'\n'}{self.city}{'\n'}
         {self.birth_date}{'\n'}{self.date_time_created}{'\n'}{self.rating_avg}{'\n'}{self.job_ammount_done}{'\n'}{self.gender}{'\n'}{self.pronouns}{'\n'}"""
         
-        def change_rating(self, rating : int, db_session : Session | None = None) -> bool:
+        def change_rating(self, rating : int, db_session : Session | None = None, commit : bool = True) -> bool:
             if self == global_objects.admin:
                 return False
             db_was_empty = db_session == None
@@ -78,11 +80,11 @@ def user_model_factory(bind_key, _roles):
             else:
                 self.rating_avg = int(((float(self.rating_avg) * self.rating_count) + rating) / (self.rating_count + 1))
                 self.rating_count += 1
-            if db_was_empty:
+            if db_was_empty or commit:
                 db_session.commit()
             return True
         
-        def increment_job_ammount_done(self, db_session : Session | None = None) -> bool:
+        def increment_job_ammount_done(self, db_session : Session | None = None, commit : bool = True) -> bool:
             if self == global_objects.admin:
                 return False
             db_was_empty = db_session == None
@@ -90,11 +92,11 @@ def user_model_factory(bind_key, _roles):
                 db_session = get_user_session(self.__bind_key__ == global_objects.JOBTAKERS_BINDKEY)
                 db_session.begin()
             self.job_ammount_done += 1
-            if db_was_empty:
+            if db_was_empty or commit:
                 db_session.commit()
             return True
             
-        def edit_account(self, request : Request, db_session : Session | None = None) -> bool:#request.form should contain account data minus email and an old and new password
+        def edit_account(self, request : Request, db_session : Session | None = None, commit : bool = True) -> bool:#request.form should contain account data minus email and an old and new password
             #validates and changes user accesible data by a user request
             if self == global_objects.admin:
                 return False
@@ -129,6 +131,7 @@ def user_model_factory(bind_key, _roles):
                 user_type.last_name : request.form['last_name'],
                 user_type.phone_number : phonenumbers.format_number(phone_number, PhoneNumberFormat.E164),
                 user_type.country : country,
+                user_type.city : request.form['city'],
                 user_type.birth_date : birthdate,
                 user_type.gender : gender,
                 user_type.pronouns : f"{request.form['pronouns_1']}/{request.form['pronouns_2']}"
@@ -148,12 +151,12 @@ def user_model_factory(bind_key, _roles):
             if not query.first().edit_password(request.form['password'], password_session):
                 return False
             password_session.commit()
-            if db_was_empty:
+            if db_was_empty or commit:
                 db_session.commit()
             print(self)
             return True
         
-        def delete_account(self, db_session : Session | None = None) -> bool:
+        def delete_account(self, db_session : Session | None = None, commit : bool = True) -> bool:
             #deletes a user account and password from the dbs
             if self == global_objects.admin:
                 return False
@@ -169,7 +172,7 @@ def user_model_factory(bind_key, _roles):
                 return False
             password_session.commit()
             db_session.delete(self)
-            if db_was_empty:
+            if db_was_empty or commit:
                 db_session.commit()
             return True
         
@@ -310,7 +313,6 @@ def validate_login_attempt(request, is_jobtaker) -> bool:#request.form should co
 
 def create_account(request, is_jobtaker) -> bool:#request.form should contain account data and a password
     #validates, creates and adds a user+psswrd to the dbs from a user request
-    
     #acc creation takes a while cuz we need to verify email deliverability
     if not validate_user_creation_request(request):
         return False
@@ -322,7 +324,7 @@ def create_account(request, is_jobtaker) -> bool:#request.form should contain ac
     if get_user_by_phone(phone_number, is_jobtaker) != None:
         print("phone already in use")
         return False
-    user = get_user_type(is_jobtaker)(request.form['first_name'], request.form['last_name'], email, phonenumbers.format_number(phone_number, PhoneNumberFormat.E164), Country(request.form['country']), datetime.strptime(request.form['birthdate'], "%Y-%m-%d").date(), Gender(int(request.form['gender'])), f"{request.form['pronouns_1']}/{request.form['pronouns_2']}")
+    user = get_user_type(is_jobtaker)(request.form['first_name'], request.form['last_name'], email, phonenumbers.format_number(phone_number, PhoneNumberFormat.E164), Country(request.form['country']), request.form['city'], datetime.strptime(request.form['birthdate'], "%Y-%m-%d").date(), Gender(int(request.form['gender'])), f"{request.form['pronouns_1']}/{request.form['pronouns_2']}")
     #add password to db
     if user == global_objects.admin:
         return False

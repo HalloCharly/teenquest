@@ -62,12 +62,15 @@ class Gender(Enum):
     OTHER = 3
 
 class JobState(Enum):
-    CREATED = 0 #job gets created and put on the market
+    CREATED = 0
     ACCEPTED_TAKER = 1
     ACCEPTED_MAKER = 2
     STARTED = 3
     ENDED = 4
     PAYED = 5
+
+class JobFilter(Enum):
+    DEFAULT = 0
     
 def make_admin_object(admin_type):
     #creates the admin object
