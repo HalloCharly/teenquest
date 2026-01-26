@@ -71,40 +71,56 @@ class Job(db.Model):
         #validates and changes user accessible job data from a user request if job isn't locked
         if not validate_job_request(request):
             return False
-        if self != global_objects.admin:
-            return False
-        if db_session == None:
+        db_was_empty = db_session == None
+        if db_was_empty:
             db_session : Session = sessionmaker_job()
             db_session.begin()
         if self.job_state.value >= JobState.ACCEPTED_MAKER.value:#if job_state is alr accepted, block job editing
             return False
-        self.job_type = request.form['job_type']
-        self.date_time_scheduled_start = datetime.strptime(request.form['job_scheduled_start'], "%Y-%m-%dT%H:%M")
-        self.date_time_scheduled_end = datetime.strptime(request.form['job_scheduled_end'], "%Y-%m-%dT%H:%M")
-        self.country = Country(request.form['country'])
-        self.city = request.form['city']
-        self.zip_code = request.form['zip_code']
-        self.street = request.form['street']
-        self.job_title = request.form['job_title']
-        self.job_description = request.form['job_description']
-        self.job_salary = Decimal(request.form['job_salary'])
-        db_session.commit()
+        db_session.query(Job).filter(Job.id == self.id).update({
+            Job.job_type : request.form['job_type'],
+            Job.date_time_scheduled_start : datetime.strptime(request.form['job_scheduled_start'], "%Y-%m-%dT%H:%M"),
+            Job.date_time_scheduled_end : datetime.strptime(request.form['job_scheduled_end'], "%Y-%m-%dT%H:%M"),
+            Job.country : Country(request.form['country']),
+            Job.city : request.form['city'],
+            Job.zip_code : request.form['zip_code'],
+            Job.street : request.form['street'],
+            Job.job_title : request.form['job_title'],
+            Job.job_description : request.form['job_description'],
+            Job.job_salary : Decimal(request.form['job_salary'])
+        })
+        db_session.flush()
+        #self.job_type = request.form['job_type']
+        #self.date_time_scheduled_start = datetime.strptime(request.form['job_scheduled_start'], "%Y-%m-%dT%H:%M")
+        #self.date_time_scheduled_end = datetime.strptime(request.form['job_scheduled_end'], "%Y-%m-%dT%H:%M")
+        #self.country = Country(request.form['country'])
+        #self.city = request.form['city']
+        #self.zip_code = request.form['zip_code']
+        #self.street = request.form['street']
+        #self.job_title = request.form['job_title']
+        #self.job_description = request.form['job_description']
+        #self.job_salary = Decimal(request.form['job_salary'])
+        if db_was_empty:
+            db_session.commit()
         return True
     
     def deny_jobtaker_job_state(self, db_session : Session | None = None):
         if self.job_state != global_objects.JobState.ACCEPTED_TAKER:
             return False
-        if db_session == None:
+        db_was_empty = db_session == None
+        if db_was_empty:
             db_session : Session = sessionmaker_job()
             db_session.begin()
         self.job_state = JobState.CREATED
         self.jobtaker_id = None
         self.date_time_accepted_taker = None
-        db_session.commit()
+        if db_was_empty:
+            db_session.commit()
         
     def progress_job_state(self, job_state, rating : int | None = None, jobtaker_id : int | None = None, db_session : Session | None = None) -> bool:
         #"progresses" job forward (reffer to chart)
-        if db_session == None:
+        db_was_empty = db_session == None
+        if db_was_empty:
             db_session : Session = sessionmaker_job()
             db_session.begin()
         if job_state.value - 1 != self.job_state.value:
@@ -128,11 +144,11 @@ class Job(db.Model):
                     return False
                 self.date_time_ended = datetime.now(timezone.utc).astimezone()
                 search = get_user_by_id(self.jobmaker_id, False)
-                if search == None:
-                    return False
-                (user_session, user_query) = search
-                user_query.first().change_rating(rating)
-                user_session.commit()
+                if search != None:
+                    (user_session, user_query) = search
+                    user_query.first().change_rating(rating, user_session)
+                    update_jobs_ratings(user_query.first())
+                    user_session.commit()
             case JobState.PAYED:
                 if rating == None:
                     print("Failed to provide rating to jobstate progressor")
@@ -143,29 +159,32 @@ class Job(db.Model):
                 if query.count() > 5:
                     query.order_by(Job.date_time_payed).limit(query.count()-5).delete()
                 search = get_user_by_id(self.jobtaker_id, True)
-                if search == None:
-                    return False
-                (jobtaker_session, jobtaker_query) = search
-                jobtaker_query.first().change_rating(rating, jobtaker_session)
-                jobtaker_query.first().increment_job_ammount_done(jobtaker_session)
-                jobtaker_session.commit()
+                if search != None:
+                    (jobtaker_session, jobtaker_query) = search
+                    jobtaker_query.first().change_rating(rating, jobtaker_session)
+                    jobtaker_query.first().increment_job_ammount_done(jobtaker_session)
+                    jobtaker_session.commit()
                 search = get_user_by_id(self.jobmaker_id, False)
-                if search == None:
-                    return False
-                (jobmaker_session, jobmaker_query) = search
-                jobmaker_query.first().increment_job_ammount_done(jobmaker_session)
-                jobmaker_session.commit()
+                if search != None:
+                    (jobmaker_session, jobmaker_query) = search
+                    jobmaker_query.first().increment_job_ammount_done(jobmaker_session)
+                    jobmaker_session.commit()
         self.job_state = job_state
-        db_session.commit()
+        if db_was_empty:
+            db_session.commit()
         return True
 
     def delete_job(self, db_session=None) -> bool:
         #deletes job if it isn't locked
-        if db_session == None:
+        if self.job_state.value >= JobState.ACCEPTED_MAKER.value:#if job_state is alr accepted, block job editing
+            return False
+        db_was_empty = db_session == None
+        if db_was_empty:
             db_session = sessionmaker_job()
             db_session.begin()
         db_session.delete(self)
-        db_session.commit()
+        if db_was_empty:
+            db_session.commit()
         return True
 
 def get_all_jobtaker_jobs(user) -> Tuple[Session, Query[Job]] | None:
@@ -210,7 +229,7 @@ def create_job(user, request) -> bool:
         return False
     if user != global_objects.admin and search[1].first() != user:
         return False
-    job = Job(user.id, request.form['job_type'], datetime.strptime(request.form['job_scheduled_start'], "%Y-%m-%dT%H:%M"),
+    job = Job(user.id, user.rating_avg, request.form['job_type'], datetime.strptime(request.form['job_scheduled_start'], "%Y-%m-%dT%H:%M"),
             datetime.strptime(request.form['job_scheduled_end'], "%Y-%m-%dT%H:%M"), Country(request.form['country']), request.form['city'], request.form['zip_code'], request.form['street'], request.form['job_title'],
             request.form['job_description'], Decimal(request.form['job_salary']))
     db_session : Session = sessionmaker_job()
@@ -226,7 +245,7 @@ def update_jobs_ratings(user) -> bool:
     if jobs == None:
         return False
     (db_session, query) = jobs
-    query.update({Job.jobmaker_rating : user.rating})
+    query.update({Job.jobmaker_rating : user.rating_avg})
     db_session.commit()
     return True
 

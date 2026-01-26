@@ -68,22 +68,30 @@ def user_model_factory(bind_key, _roles):
         def change_rating(self, rating : int, db_session : Session | None = None) -> bool:
             if self == global_objects.admin:
                 return False
-            if db_session == None:
+            db_was_empty = db_session == None
+            if db_was_empty:
                 db_session = get_user_session(self.__bind_key__ == global_objects.JOBTAKERS_BINDKEY)
                 db_session.begin()
-            self.rating_avg = int(((float(self.rating_avg) * self.rating_count) + rating) / (self.rating_count + 1))
-            self.rating_count += 1
-            db_session.commit()
+            if self.rating_avg == None:
+                self.rating_avg = rating
+                self.rating_count = 1
+            else:
+                self.rating_avg = int(((float(self.rating_avg) * self.rating_count) + rating) / (self.rating_count + 1))
+                self.rating_count += 1
+            if db_was_empty:
+                db_session.commit()
             return True
         
         def increment_job_ammount_done(self, db_session : Session | None = None) -> bool:
             if self == global_objects.admin:
                 return False
-            if db_session == None:
+            db_was_empty = db_session == None
+            if db_was_empty:
                 db_session = get_user_session(self.__bind_key__ == global_objects.JOBTAKERS_BINDKEY)
                 db_session.begin()
             self.job_ammount_done += 1
-            db_session.commit()
+            if db_was_empty:
+                db_session.commit()
             return True
             
         def edit_account(self, request : Request, db_session : Session | None = None) -> bool:#request.form should contain account data minus email and an old and new password
@@ -111,7 +119,8 @@ def user_model_factory(bind_key, _roles):
                 gender = Gender(int(request.form['gender']))
             except:
                 return handle_error(e)
-            if db_session == None:
+            db_was_empty = db_session == None
+            if db_was_empty:
                 db_session = get_user_session(self.__bind_key__ == global_objects.JOBTAKERS_BINDKEY)
                 db_session.begin()
             user_type = get_user_type(self.__bind_key__ == global_objects.JOBTAKERS_BINDKEY)
@@ -138,7 +147,9 @@ def user_model_factory(bind_key, _roles):
             (password_session, query) = search
             if not query.first().edit_password(request.form['password'], password_session):
                 return False
-            db_session.commit()
+            password_session.commit()
+            if db_was_empty:
+                db_session.commit()
             print(self)
             return True
         
@@ -146,7 +157,8 @@ def user_model_factory(bind_key, _roles):
             #deletes a user account and password from the dbs
             if self == global_objects.admin:
                 return False
-            if db_session == None:
+            db_was_empty = db_session == None
+            if db_was_empty:
                 db_session = get_user_session(self.__bind_key__ == global_objects.JOBTAKERS_BINDKEY)
                 db_session.begin()
             search = passwords.get_password_by_id(self.id, self.__bind_key__ == global_objects.JOBTAKERS_BINDKEY)
@@ -155,8 +167,10 @@ def user_model_factory(bind_key, _roles):
             (password_session, query) = search
             if not query.first().delete_password(password_session):
                 return False
+            password_session.commit()
             db_session.delete(self)
-            db_session.commit()
+            if db_was_empty:
+                db_session.commit()
             return True
         
     return DynamicUser
@@ -182,7 +196,7 @@ def get_user_session(is_jobtaker) -> Session:
 def get_user_by_id(user_id, is_jobtaker) -> Tuple[Session, Query[Any]] | None:
     #gets a user by id
     if(user_id == 0):
-        return global_objects.admin
+        return None
     db_session = get_user_session(is_jobtaker)
     db_session.begin()
     user_type = get_user_type(is_jobtaker)

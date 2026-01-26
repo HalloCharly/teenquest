@@ -14,10 +14,8 @@ import jobs
 from global_objects import db, login_manager, admin_permission, jobtaker_permission, jobmaker_permission, JobState
 from flask import Flask, flash, render_template, redirect, request, session, url_for
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy_utils import CountryType, Country
 from flask_login import current_user, login_required, logout_user
 from flask_principal import identity_changed, AnonymousIdentity, identity_loaded
-from jobs import Job
 
 #main app file
 
@@ -48,7 +46,7 @@ jobs.init_module(app)
 global_objects.setup_principals(app)
     
 class Log(db.Model):
-    __bind_key__ = global_objects.JOBS_BINDKEY
+    __bind_key__ = global_objects.LOGS_BINDKEY
     id = db.Column(db.Integer, primary_key=True)
     sender_id = db.Column(db.Integer, nullable=False) #we set the ids to positive if its a jbmaker, and negative if its a jbtaker
     recipient_id = db.Column(db.Integer, nullable=False)
@@ -65,7 +63,7 @@ class Log(db.Model):
         return f"Log{'\n'}{self.id}{'\n'}{self.sender_id}{'\n'}{self.recipient_id}{'\n'}{self.date_time_sent}{'\n'}{self.content}{'\n'}"
 
 def test_log(force):#adds 1 placeholder log || ts is temporary, jus using this for now
-    db_session = sessionmaker(bind=db.engines[global_objects.JOBS_BINDKEY])()
+    db_session = sessionmaker(bind=db.engines[global_objects.LOGS_BINDKEY])()
     db_session.begin()
     if db_session.query(Log).filter(Log.sender_id == 1).count() == 0 or force:
         db_session.add(Log(1, -1, datetime.min, "i will do something brand safe to u"))
@@ -229,7 +227,7 @@ def jobmarket_jobtaker_confirm():
         return render_template("take_job.html")
     (db_session, query) = search
     match JobState(int(request.form['state'])):
-        case JobState.ACCEPTED_MAKER:
+        case JobState.ACCEPTED_TAKER:
             try:
                 query.first().progress_job_state(JobState(int(request.form['state'])), jobtaker_id=current_user.id, db_session=db_session)
             except ValueError as e:
@@ -250,7 +248,26 @@ def jobmarket_jobtaker_confirm():
         case _:
             print("cant do dat")
             return render_template("take_job.html")
+    db_session.commit()
     return render_template("take_job.html")
+
+@app.route("/jobtaker/jobmarket/unconfirm", methods=["POST"])
+@jobtaker_permission.require(http_exception=401)
+@login_required
+def jobmarket_jobtaker_unconfirm():
+    try:
+        search = jobs.get_job_by_id(int(request.form['job_id']))
+    except ValueError as e:
+        print(e)
+        return render_template("take_job.html")
+    if search == None:
+        print("bad id")
+        return render_template("take_job.html")
+    (db_session, query) = search
+    query.first().deny_jobtaker_job_state(db_session)
+    db_session.commit()
+    return render_template("take_job.html")
+
 
 
 
@@ -297,6 +314,7 @@ def jobmarket_jobmaker_confirm():
         case _:
             print("cant do dat")
             return render_template("make_job.html")
+    db_session.commit()
     return render_template("make_job.html")
 
 @app.route("/jobmaker/jobmarket/edit", methods=["POST"])
@@ -312,21 +330,43 @@ def jobmarket_jobmaker_edit():
         print("bad id")
         return render_template("make_job.html")
     (db_session, query) = search
-    query.first().edit_job(request, db_session)
+    print(query.first().edit_job(request, db_session))
+    db_session.commit()
     return render_template("make_job.html")
 
 @app.route("/jobmaker/jobmarket/fry_jobtaker", methods=["POST"])
 @jobmaker_permission.require(http_exception=401)
 @login_required
 def jobmarket_jobmaker_fry_jobtaker():
-    search = jobs.get_job_by_id(int(request.form['job_id']))
+    try:
+        search = jobs.get_job_by_id(int(request.form['job_id']))
+    except ValueError as e:
+        print(e)
+        return render_template("make_job.html")
     if search == None:
         print("bad id")
         return render_template("make_job.html")
     (db_session, query) = search
     query.first().deny_jobtaker_job_state(db_session)
+    db_session.commit()
     return render_template("make_job.html")
 
+@app.route("/jobmaker/jobmarket/delete", methods=["POST"])
+@jobmaker_permission.require(http_exception=401)
+@login_required
+def jobmarket_jobmaker_delete_job():
+    try:
+        search = jobs.get_job_by_id(int(request.form['job_id']))
+    except ValueError as e:
+        print(e)
+        return render_template("make_job.html")
+    if search == None:
+        print("bad id")
+        return render_template("make_job.html")
+    (db_session, query) = search
+    query.first().delete_job(db_session)
+    db_session.commit()
+    return render_template("make_job.html")
 
 
 @login_manager.unauthorized_handler

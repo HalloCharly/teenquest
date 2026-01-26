@@ -50,22 +50,26 @@ def password_model_factory(bind_key):
             #changes a user's password hash present in the passwords db
             if self == global_objects.admin_password:
                 return False
-            if(db_session == None):
+            db_was_empty = db_session == None
+            if db_was_empty:
                 db_session = get_password_session(self.__bind_key__ == global_objects.JOBTAKER_PASSWORDS_BINDKEY)
                 db_session.begin()
             self.password_hash = generate_password_hash(password, self.salt)
-            db_session.commit()
+            if db_was_empty:
+                db_session.commit()
             return True
             
         def delete_password(self, db_session=None) -> bool:
             #deletes a user password from passwords db
             if self == global_objects.admin_password:
                 return False
-            if(db_session == None):
+            db_was_empty = db_session == None
+            if db_was_empty:
                 db_session = get_password_session(self.__bind_key__ == global_objects.JOBTAKER_PASSWORDS_BINDKEY)
                 db_session.begin()
             db_session.delete(self)
-            db_session.commit()
+            if db_was_empty:
+                db_session.commit()
             return True
     return DynamicPassword
 
