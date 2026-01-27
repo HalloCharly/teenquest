@@ -1,7 +1,6 @@
 #Imports
 import global_objects as global_objects
 from datetime import datetime, timezone
-from enum import Enum
 
 import passwords
 from users import (init_module as user_init_module,
@@ -22,7 +21,9 @@ from flask_principal import identity_changed, AnonymousIdentity, identity_loaded
 #App
 app = Flask(__name__, template_folder='../test_html/')
 
-app.secret_key = "epstein grape chiggers"#todo:move into cfg file
+global_objects.load_configs()
+
+app.secret_key = global_objects.secret_key#todo:move into cfg file
 
 login_manager.init_app(app)
 
@@ -40,10 +41,10 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 
 #initialize all of the modules
+global_objects.init_module(app)
 user_init_module(app)
 passwords.init_module(app)
 jobs.init_module(app)
-global_objects.setup_principals(app)
     
 class Log(db.Model):
     __bind_key__ = global_objects.LOGS_BINDKEY
