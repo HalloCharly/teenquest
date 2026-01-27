@@ -114,7 +114,7 @@ def user_model_factory(bind_key, _roles):
             except ValueError as e:
                 return handle_error(e)
             try:
-                birthdate = datetime.strptime(request.form['birthdate'], "%Y-%m-%d").date()
+                birthdate = datetime.strptime(request.form['birthdate'], "%Y-%m-%d").astimezone().date()
             except ValueError as e:
                 return handle_error(e)
             try:
@@ -283,7 +283,7 @@ def validate_user_creation_request(request : Request) -> bool:
     except ValueError as e:
         return handle_error(e)
     try:
-        date = datetime.strptime(request.form['birthdate'], "%Y-%m-%d").date()
+        date = datetime.strptime(request.form['birthdate'], "%Y-%m-%d").astimezone().date()
     except ValueError as e:
         return handle_error(e)
     if(date > datetime.now(timezone.utc).astimezone().date()):
@@ -324,7 +324,7 @@ def create_account(request, is_jobtaker) -> bool:#request.form should contain ac
     if get_user_by_phone(phone_number, is_jobtaker) != None:
         print("phone already in use")
         return False
-    user = get_user_type(is_jobtaker)(request.form['first_name'], request.form['last_name'], email, phonenumbers.format_number(phone_number, PhoneNumberFormat.E164), Country(request.form['country']), request.form['city'], datetime.strptime(request.form['birthdate'], "%Y-%m-%d").date(), Gender(int(request.form['gender'])), f"{request.form['pronouns_1']}/{request.form['pronouns_2']}")
+    user = get_user_type(is_jobtaker)(request.form['first_name'], request.form['last_name'], email, phonenumbers.format_number(phone_number, PhoneNumberFormat.E164), Country(request.form['country']), request.form['city'], datetime.strptime(request.form['birthdate'], "%Y-%m-%d").astimezone().date(), Gender(int(request.form['gender'])), f"{request.form['pronouns_1']}/{request.form['pronouns_2']}")
     #add password to db
     if user == global_objects.admin:
         return False

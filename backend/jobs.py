@@ -80,8 +80,8 @@ class Job(db.Model):
             return False
         db_session.query(Job).filter(Job.id == self.id).update({
             Job.job_type : request.form['job_type'],
-            Job.date_time_scheduled_start : datetime.strptime(request.form['job_scheduled_start'], "%Y-%m-%dT%H:%M"),
-            Job.date_time_scheduled_end : datetime.strptime(request.form['job_scheduled_end'], "%Y-%m-%dT%H:%M"),
+            Job.date_time_scheduled_start : datetime.strptime(request.form['job_scheduled_start'], "%Y-%m-%dT%H:%M").astimezone(),
+            Job.date_time_scheduled_end : datetime.strptime(request.form['job_scheduled_end'], "%Y-%m-%dT%H:%M").astimezone(),
             Job.country : Country(request.form['country']),
             Job.city : request.form['city'],
             Job.zip_code : request.form['zip_code'],
@@ -126,6 +126,7 @@ class Job(db.Model):
             db_session.begin()
         if job_state.value - 1 != self.job_state.value:
             return False
+        self.job_state = job_state
         match job_state:
             case JobState.CREATED:
                 self.date_time_created = datetime.now(timezone.utc).astimezone()
@@ -155,9 +156,10 @@ class Job(db.Model):
                     return False
                 self.date_time_payed = datetime.now(timezone.utc).astimezone()
                 db_session.flush()
-                query = db_session.query(Job).filter(Job.job_state == JobState.PAYED)
+                query = db_session.query(Job.id).filter(Job.job_state == JobState.PAYED)
                 if query.count() > 5:
-                    query.order_by(Job.date_time_payed).limit(query.count()-5).delete()
+                    sub_query = query.order_by(Job.date_time_payed).limit(query.count()-5).subquery()
+                    db_session.query(Job).filter(Job.id.in_(sub_query)).delete()
                 search = get_user_by_id(self.jobtaker_id, True)
                 if search != None:
                     (jobtaker_session, jobtaker_query) = search
@@ -167,7 +169,6 @@ class Job(db.Model):
                 if search != None:
                     (jobmaker_session, jobmaker_query) = search
                     jobmaker_query.first().increment_job_ammount_done(jobmaker_session)
-        self.job_state = job_state
         if db_was_empty or commit:
             db_session.commit()
         return True
@@ -227,8 +228,8 @@ def create_job(user, request : Request) -> bool:
         return False
     if user != global_objects.admin and search[1].first() != user:
         return False
-    job = Job(user.id, user.rating_avg, request.form['job_type'], datetime.strptime(request.form['job_scheduled_start'], "%Y-%m-%dT%H:%M"),
-            datetime.strptime(request.form['job_scheduled_end'], "%Y-%m-%dT%H:%M"), Country(request.form['country']), request.form['city'], request.form['zip_code'], request.form['street'], request.form['job_title'],
+    job = Job(user.id, user.rating_avg, request.form['job_type'], datetime.strptime(request.form['job_scheduled_start'], "%Y-%m-%dT%H:%M").astimezone(),
+            datetime.strptime(request.form['job_scheduled_end'], "%Y-%m-%dT%H:%M").astimezone(), Country(request.form['country']), request.form['city'], request.form['zip_code'], request.form['street'], request.form['job_title'],
             request.form['job_description'], Decimal(request.form['job_salary']))
     db_session : Session = sessionmaker_job()
     db_session.begin()
@@ -242,6 +243,7 @@ def update_jobs_ratings(user) -> bool:
     if jobs == None:
         return False
     (db_session, query) = jobs
+    query.filter(Job.job_state != JobState.PAYED)
     query.update({Job.jobmaker_rating : user.rating_avg})
     db_session.commit()
     return True
@@ -252,15 +254,17 @@ def validate_job_request(request : Request) -> bool:
         print(e)
         return False
     try:
-        job_scheduled_start = datetime.strptime(request.form['job_scheduled_start'], "%Y-%m-%dT%H:%M")
+        job_scheduled_start = datetime.strptime(request.form['job_scheduled_start'], "%Y-%m-%dT%H:%M").astimezone()
     except ValueError as e:
         return handle_error(e)
     try:
-        job_scheduled_end = datetime.strptime(request.form['job_scheduled_end'], "%Y-%m-%dT%H:%M")
+        job_scheduled_end = datetime.strptime(request.form['job_scheduled_end'], "%Y-%m-%dT%H:%M").astimezone()
     except ValueError as e:
         return handle_error(e)
     if job_scheduled_start > job_scheduled_end:
         return handle_error("dates got fd upp")
+    if job_scheduled_end < datetime.now(timezone.utc).astimezone():
+        return handle_error("cant make job start before today")
     try:
         Country(request.form['country'])
     except ValueError as e:

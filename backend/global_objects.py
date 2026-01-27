@@ -75,7 +75,7 @@ class JobFilter(Enum):
 def make_admin_object(admin_type):
     #creates the admin object
     global admin
-    admin = admin_type("admin", "", "", '', Country('BE'), datetime.min, Gender.MALE, "que/quem")
+    admin = admin_type("admin", "", "", '', Country('BE'), "", datetime.min, Gender.MALE, "que/quem")
     admin.id = 0
     admin.date_time_created = datetime.min
     admin.rating = 0
