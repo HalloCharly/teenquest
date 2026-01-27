@@ -21,23 +21,15 @@ from flask_principal import identity_changed, AnonymousIdentity, identity_loaded
 #App
 app = Flask(__name__, template_folder='../test_html/')
 
-global_objects.load_configs()
+app.config.from_pyfile('./flask_config.py')
 
-app.secret_key = global_objects.secret_key#todo:move into cfg file
+@app.before_request
+def make_session_permanent():
+    session.permanent = session.get('account_type') != global_objects.ADMIN_SESSION_NAME
 
 login_manager.init_app(app)
 
-#Db setupa
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///jobs.db"
-app.config["SQLALCHEMY_BINDS"] = {
-    global_objects.JOBTAKERS_BINDKEY: "sqlite:///users.db",
-    global_objects.JOBMAKERS_BINDKEY: "sqlite:///users.db",
-    global_objects.JOBTAKER_PASSWORDS_BINDKEY: "sqlite:///passwords.db",
-    global_objects.JOBMAKER_PASSWORDS_BINDKEY: "sqlite:///passwords.db",
-    global_objects.JOBS_BINDKEY: "sqlite:///jobs.db",
-    global_objects.LOGS_BINDKEY: "sqlite:///logs.db"
-}
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+#Db setup
 db.init_app(app)
 
 #initialize all of the modules

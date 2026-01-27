@@ -16,8 +16,7 @@ app : Flask
 admin = None
 admin_password = None
 
-admin_password_hash = None#todo:move into cfg file or smwhere idk
-secret_key = None
+admin_password_hash = "c31083adbb87e2490499a657d7f790dbfa7571f5f639b64c1e6ce44d7f06c4d2"
 
 JOBTAKERS_BINDKEY : str = "jobtakers"
 JOBMAKERS_BINDKEY : str = "jobmakers"
@@ -49,33 +48,6 @@ jobtaker_password_type : type
 jobmaker_password_type : type
 job_type : type
 log_type : type
-
-CONFIG_ARGS : List[str] = ["-Secret_Key:", "-Admin_Password_Hash:"]
-
-def load_configs():
-    #goes thru config_backend.cfg, finds all the args, and reads them (i cooked here)
-    global admin_password_hash
-    global secret_key
-    found_data = {None:None}
-    with open('backend_config.cfg', 'r') as file:
-        for line in file:
-            for key in CONFIG_ARGS:
-                line.strip()
-                command_index = line.find(key)
-                if(command_index == -1):
-                    continue
-                command_index += len(key)
-                start_index = line.find('''"''', command_index, len(line)) + 1
-                end_index = line.find('''"''', start_index, len(line))
-                found_data[key] = line[start_index:end_index]
-        for key, value in found_data.items():
-            if key == None:
-                continue
-            match key:
-                case "-Admin_Password_Hash:":
-                    admin_password_hash = value
-                case "-Secret_Key:":
-                    secret_key = value
 
 def init_module(application):
     #sets up the Principals (user session access privileges)

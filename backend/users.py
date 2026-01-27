@@ -248,12 +248,13 @@ def get_user_by_phone(phone_number, is_jobtaker) -> Tuple[Session, Query[Any]] |
 @login_manager.user_loader
 def load_user(user_id):
     #gets a user depending on the session account type
-    if(session['account_type'] == global_objects.ADMIN_SESSION_NAME):
+    
+    if(session.get('account_type') == global_objects.ADMIN_SESSION_NAME):
         return global_objects.admin
-    elif(session['account_type'] == global_objects.JOBTAKER_SESSION_NAME or session['account_type'] == global_objects.JOBMAKER_SESSION_NAME):
-        db_session = get_user_session(session['account_type'] == global_objects.JOBTAKER_SESSION_NAME)
+    elif(session.get('account_type') == global_objects.JOBTAKER_SESSION_NAME or session.get('account_type') == global_objects.JOBMAKER_SESSION_NAME):
+        db_session = get_user_session(session.get('account_type') == global_objects.JOBTAKER_SESSION_NAME)
         db_session.begin()
-        return db_session.query(get_user_type(session['account_type'] == global_objects.JOBTAKER_SESSION_NAME)).get({"id":int(user_id)})
+        return db_session.query(get_user_type(session.get('account_type') == global_objects.JOBTAKER_SESSION_NAME)).get({"id":int(user_id)})
     else:
         return None
 
@@ -307,7 +308,7 @@ def validate_login_attempt(request, is_jobtaker) -> bool:#request.form should co
     if not password_query.first().check_password_hash(request.form['password']):
         return False
     session['account_type'] = (lambda x : global_objects.JOBTAKER_SESSION_NAME if x else global_objects.JOBMAKER_SESSION_NAME)(is_jobtaker)
-    login_user(user_query.first())
+    login_user(user_query.first(), remember=True)
     identity_changed.send(app, identity=Identity(user_query.first().id))
     return True
 
@@ -352,12 +353,13 @@ def on_identity_loaded(sender, identity):
         for role in identity.user.roles:
             identity.provides.add(role)
     print(identity.provides)#i leave ts on for debuging, it print all usr roles
+    print(session['account_type'])
 
 def validate_admin_login(password) -> bool:
     #checks admin login from user request
     if(global_objects.admin_password.check_password_hash(password)):
         session['account_type'] = global_objects.ADMIN_SESSION_NAME
-        login_user(global_objects.admin)
+        login_user(global_objects.admin, remember=False, duration=0)
         identity_changed.send(app, identity=Identity(global_objects.admin.id))
         return True
     else:
