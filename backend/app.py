@@ -19,7 +19,7 @@ from flask_principal import identity_changed, AnonymousIdentity, identity_loaded
 #main app file
 
 #App
-app = Flask(__name__, template_folder='../test_html/')
+app = Flask(__name__, template_folder='../app/') #changed it to the app (christian)
 
 app.config.from_pyfile('./flask_config.py')
 

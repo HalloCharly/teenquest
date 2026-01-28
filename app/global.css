@@ -1,0 +1,148 @@
+html, body {
+  margin-top: 0;
+  min-height: 100%;
+  min-width: 100%;
+  padding: 0;
+  font-family:Arial, Helvetica, sans-serif
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: flex-start;
+  width: 100vw;
+  min-height: 100vh;
+  row-gap: 0;
+  padding-top: 100px;
+}
+
+.teenquest{
+  color: var(--s-text-color);
+  font-size: 40px;
+}
+
+.in-email {
+  width: 300px;     
+  padding: 10px 15px;      
+  font-size: 20px;
+  border: 2px solid #808080;  
+  border-radius: 10px;      
+  outline: none;            
+  transition: border-color 0.3s, box-shadow 0.3s;
+  height: 20px;
+}
+
+.in-email::placeholder {
+  color: #808080;              
+  font-size: 15px;
+  opacity: 0.8;
+}
+
+.in-email:focus {
+  border-color: #6c63ff;   
+  box-shadow: 0 0 5px rgba(108, 99, 255, 0.5); 
+}
+
+.in-password {
+  width: 300px;     
+  padding: 10px 15px;      
+  font-size: 20px;
+  border: 2px solid #808080;  
+  border-radius: 10px;      
+  outline: none;            
+  transition: border-color 0.3s, box-shadow 0.3s;
+  margin-top: 10px;
+  height: 20px;
+}
+
+.in-password:focus {
+  border-color: #6c63ff;   
+  box-shadow: 0 0 5px rgba(108, 99, 255, 0.5); 
+}
+
+.continue-button{
+  color: #ffffff;
+  background-color: #000000;
+  border: 2px solid #000000;
+  border-radius: 10px;
+  width: 330px;
+  padding: 12px 15px;
+  margin-top: 10px;
+  transition: background-color 0.3s, cursor 0.3s, border 0.3s;
+}
+
+.continue-button:hover {
+  background-color: #222222;
+  border: 2px solid #222222;
+  cursor: pointer;
+}
+
+.login-text {
+  font-size: 14px;           /* small, readable text */
+  color: #333;               /* text color */
+  text-align: center;        /* center it horizontally */
+}
+
+.login-text a {
+  color: #6c63ff;            /* link color */
+  text-decoration: none;     /* remove underline */
+  font-weight: 600;          /* optional: make it bold */
+  margin-left: 4px;          /* small space from question */
+  transition: color 0.3s;
+}
+
+.login-text a:hover {
+  color: #4b45c3;            /* darker on hover */
+  text-decoration: underline; /* optional hover effect */
+}
+
+.divider{
+  opacity: 80%;
+  color: #808080;
+  margin-bottom: 10px;
+}
+
+.social-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 330px;
+  padding: 10px 15px;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s, border 0.3s;
+}
+
+.social-btn img {
+  width: 20px;
+  height: 20px;
+}
+
+.social-btn.google {
+  background-color: #ffffff;
+  color: #000000;
+  border: 1px solid #808080;
+}
+
+.social-btn.google:hover {
+  background-color: #808080;
+  border: 1px solid #000000;
+}
+
+.social-btn.apple {
+  background-color: #ffffff;
+  color: #000000;
+  border: 1px solid #808080;
+  margin-top: 10px;
+}
+
+.social-btn.apple:hover {
+  background-color: #808080;
+  border: 1px solid #000000;
+}
