@@ -1,7 +1,7 @@
 #Imports
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Tuple
+from typing import Any, Dict, List, Tuple
 from flask import Flask, session, Request
 import passwords
 import phonenumbers
@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker, Session, Query
 import global_objects
 from global_objects import db, login_manager, Gender
 from sqlalchemy_utils import EmailType, CountryType, PhoneNumberType, Country
-from flask_principal import identity_changed, UserNeed, Identity
+from flask_principal import identity_changed, UserNeed, Identity, identity_loaded
 
 #handles user validation, and user db operations(add, edit, delete)
 
@@ -100,27 +100,9 @@ def user_model_factory(bind_key, _roles):
             #validates and changes user accesible data by a user request
             if self == global_objects.admin:
                 return False
-            def handle_error(e):
-                print(e)
+            (is_valid, formated_data) = validate_user_request(request, global_objects.USER_EDITING_REQ_FORM_KEYS, False)
+            if not is_valid:
                 return False
-            try:
-                phone_number = phonenumbers.parse(request.form['phone_num'])
-                if(not phonenumbers.is_valid_number(phone_number)):
-                    return handle_error("Invalid phone number")
-            except NumberParseException as e:
-                return handle_error(e)
-            try:
-                country = Country(request.form['country'])
-            except ValueError as e:
-                return handle_error(e)
-            try:
-                birthdate = datetime.strptime(request.form['birthdate'], "%Y-%m-%d").astimezone().date()
-            except ValueError as e:
-                return handle_error(e)
-            try:
-                gender = Gender(int(request.form['gender']))
-            except:
-                return handle_error(e)
             db_was_empty = db_session == None
             if db_was_empty:
                 db_session = get_user_session(self.__bind_key__ == global_objects.JOBTAKERS_BINDKEY)
@@ -129,11 +111,11 @@ def user_model_factory(bind_key, _roles):
             db_session.query(user_type).filter(user_type.id == self.id).update({
                 user_type.first_name : request.form['first_name'],
                 user_type.last_name : request.form['last_name'],
-                user_type.phone_number : phonenumbers.format_number(phone_number, PhoneNumberFormat.E164),
-                user_type.country : country,
+                user_type.phone_number : phonenumbers.format_number(formated_data['phone_num'], PhoneNumberFormat.E164),
+                user_type.country : formated_data['country'],
                 user_type.city : request.form['city'],
-                user_type.birth_date : birthdate,
-                user_type.gender : gender,
+                user_type.birth_date : formated_data['birthdate'],
+                user_type.gender : formated_data['gender'],
                 user_type.pronouns : f"{request.form['pronouns_1']}/{request.form['pronouns_2']}"
             })
             #self.first_name = request.form['first_name']
@@ -258,45 +240,57 @@ def load_user(user_id):
     else:
         return None
 
-def validate_user_creation_request(request : Request) -> bool:
+def validate_user_request(request : Request, keys : List[str], check_email_deliverability : bool = False) -> Tuple[bool, Dict[str,  Any]]:
     #checks if request.form contains parsable information
     def handle_error(e):
         print(e)
-        return False
-    try:
-        email = validate_email(request.form['email'], check_deliverability=True).normalized
-        if(email == global_objects.admin.email):
-            return handle_error("admin")
-    except EmailSyntaxError as e:
-        return handle_error(e)
-    except Exception as e:
-        return handle_error(e)
-    try:
-        phone_number = phonenumbers.parse(request.form['phone_num'])
-        if(not phonenumbers.is_valid_number(phone_number)):
-            return handle_error("invalid")
-        if(phonenumbers.format_number(phone_number, PhoneNumberFormat.E164) == global_objects.admin.phone_number):
-            return handle_error("admin")
-    except NumberParseException as e:
-        return handle_error(e)
-    try:
-        Country(request.form['country'])
-    except ValueError as e:
-        return handle_error(e)
-    try:
-        date = datetime.strptime(request.form['birthdate'], "%Y-%m-%d").astimezone().date()
-    except ValueError as e:
-        return handle_error(e)
-    if(date > datetime.now(timezone.utc).astimezone().date()):
-        return handle_error("Invalid bdate")
-    try:
-        Gender(int(request.form['gender']))
-    except:
-        return handle_error(e)
-    return True
+        return (False, None)
+    output = {}
+    for key in keys:
+        if request.form.get(key) == None:
+            return (False, None)
+        match key:
+            case 'email':
+                try:
+                    output['email'] = validate_email(request.form['email'], check_deliverability=check_email_deliverability).normalized
+                    if(output['email'] == global_objects.admin.email):
+                        return handle_error("admin")
+                except EmailSyntaxError as e:
+                    return handle_error(e)
+                except Exception as e:
+                    return handle_error(e)
+            case 'phone_num':
+                try:
+                    output['phone_num'] = phonenumbers.parse(request.form['phone_num'])
+                    if(not phonenumbers.is_valid_number(output['phone_num'])):
+                        return handle_error("invalid")
+                    if(phonenumbers.format_number(output['phone_num'], PhoneNumberFormat.E164) == global_objects.admin.phone_number):
+                        return handle_error("admin")
+                except NumberParseException as e:
+                    return handle_error(e)
+            case 'country':
+                try:
+                    output['country'] = Country(request.form['country'])
+                except ValueError as e:
+                    return handle_error(e)
+            case 'birthdate':
+                try:
+                    output['birthdate'] = datetime.strptime(request.form['birthdate'], "%Y-%m-%d").astimezone().date()
+                except ValueError as e:
+                    return handle_error(e)
+                if(output['birthdate'] > datetime.now(timezone.utc).astimezone().date()):
+                    return handle_error("Invalid bdate")
+            case 'gender':
+                try:
+                    output['gender'] = Gender(int(request.form['gender']))
+                except:
+                    return handle_error(e)
+    return (True, output)
 
-def validate_login_attempt(request, is_jobtaker) -> bool:#request.form should contain a password and an email
+def verify_login_attempt(request : Request, is_jobtaker : bool) -> bool:#request.form should contain a password and an email
     #validates and compares a provided email and password /w the dbs
+    if request.form.get('email') == None or request.form.get('password') == None:
+        return False
     search = get_user_by_email(request.form['email'], is_jobtaker)
     if(search == None):
         return False
@@ -312,20 +306,29 @@ def validate_login_attempt(request, is_jobtaker) -> bool:#request.form should co
     identity_changed.send(app, identity=Identity(user_query.first().id))
     return True
 
-def create_account(request, is_jobtaker) -> bool:#request.form should contain account data and a password
+def verify_admin_login_attempt(password) -> bool:
+    #checks admin login from user request
+    if(global_objects.admin_password.check_password_hash(password)):
+        session['account_type'] = global_objects.ADMIN_SESSION_NAME
+        login_user(global_objects.admin, remember=False, duration=0)
+        identity_changed.send(app, identity=Identity(global_objects.admin.id))
+        return True
+    else:
+        return False
+
+def create_account(request : Request, is_jobtaker : bool) -> bool:#request.form should contain account data and a password
     #validates, creates and adds a user+psswrd to the dbs from a user request
     #acc creation takes a while cuz we need to verify email deliverability
-    if not validate_user_creation_request(request):
+    (is_valid, formated_data) = validate_user_request(request, global_objects.USER_CREATION_REQ_FORM_KEYS, True)
+    if not is_valid:
         return False
-    email = validate_email(request.form['email'], check_deliverability=True).normalized
-    phone_number = phonenumbers.parse(request.form['phone_num'])
-    if get_user_by_email(email, is_jobtaker) != None:
+    if get_user_by_email(formated_data['email'], is_jobtaker) != None:
         print("email already in use")
         return False
-    if get_user_by_phone(phone_number, is_jobtaker) != None:
+    if get_user_by_phone(formated_data['phone_num'], is_jobtaker) != None:
         print("phone already in use")
         return False
-    user = get_user_type(is_jobtaker)(request.form['first_name'], request.form['last_name'], email, phonenumbers.format_number(phone_number, PhoneNumberFormat.E164), Country(request.form['country']), request.form['city'], datetime.strptime(request.form['birthdate'], "%Y-%m-%d").astimezone().date(), Gender(int(request.form['gender'])), f"{request.form['pronouns_1']}/{request.form['pronouns_2']}")
+    user = get_user_type(is_jobtaker)(request.form['first_name'], request.form['last_name'], formated_data['email'], phonenumbers.format_number(formated_data['phone_num'], PhoneNumberFormat.E164), formated_data['country'], formated_data['city'], formated_data['birthdate'], formated_data['gender'], f"{request.form['pronouns_1']}/{request.form['pronouns_2']}")
     #add password to db
     if user == global_objects.admin:
         return False
@@ -344,23 +347,14 @@ def create_account(request, is_jobtaker) -> bool:#request.form should contain ac
     session['account_type'] = (lambda x : global_objects.JOBTAKER_SESSION_NAME if x else global_objects.JOBMAKER_SESSION_NAME)(is_jobtaker)
     return True
 
+@identity_loaded.connect
 def on_identity_loaded(sender, identity):
     #loads roles to user
     identity.user = current_user
-    if(hasattr(identity.user, "id")):
+    if hasattr(identity.user, "id"):
         identity.provides.add(UserNeed(identity.user.id))
-    if(hasattr(identity.user, "roles")):
+    if hasattr(identity.user, "roles"):
         for role in identity.user.roles:
             identity.provides.add(role)
-    print(identity.provides)#i leave ts on for debuging, it print all usr roles
-    print(session['account_type'])
-
-def validate_admin_login(password) -> bool:
-    #checks admin login from user request
-    if(global_objects.admin_password.check_password_hash(password)):
-        session['account_type'] = global_objects.ADMIN_SESSION_NAME
-        login_user(global_objects.admin, remember=False, duration=0)
-        identity_changed.send(app, identity=Identity(global_objects.admin.id))
-        return True
-    else:
-        return False
+    if global_objects.testing:
+        print(identity.provides)
