@@ -23,7 +23,7 @@ body {
   font-size: 40px;
 }
 
-.in-email {
+.in-global {
   width: 300px;     
   padding: 10px 15px;      
   font-size: 20px;
@@ -31,38 +31,22 @@ body {
   border-radius: 10px;      
   outline: none;            
   transition: border-color 0.3s, box-shadow 0.3s;
+  margin-bottom: 10px;
   height: 20px;
 }
 
-.in-email::placeholder {
+.in-global::placeholder {
   color: #808080;              
   font-size: 15px;
   opacity: 0.8;
 }
 
-.in-email:focus {
+.in-global:focus {
   border-color: #6c63ff;   
   box-shadow: 0 0 5px rgba(108, 99, 255, 0.5); 
 }
 
-.in-password {
-  width: 300px;     
-  padding: 10px 15px;      
-  font-size: 20px;
-  border: 2px solid #808080;  
-  border-radius: 10px;      
-  outline: none;            
-  transition: border-color 0.3s, box-shadow 0.3s;
-  margin-top: 10px;
-  height: 20px;
-}
-
-.in-password:focus {
-  border-color: #6c63ff;   
-  box-shadow: 0 0 5px rgba(108, 99, 255, 0.5); 
-}
-
-.continue-button{
+.global-button{
   color: #ffffff;
   background-color: #000000;
   border: 2px solid #000000;
@@ -73,29 +57,29 @@ body {
   transition: background-color 0.3s, cursor 0.3s, border 0.3s;
 }
 
-.continue-button:hover {
+.global-button:hover {
   background-color: #222222;
   border: 2px solid #222222;
   cursor: pointer;
 }
 
 .login-text {
-  font-size: 14px;           /* small, readable text */
-  color: #333;               /* text color */
-  text-align: center;        /* center it horizontally */
+  font-size: 14px;
+  color: #333;
+  text-align: center;
 }
 
 .login-text a {
-  color: #6c63ff;            /* link color */
-  text-decoration: none;     /* remove underline */
-  font-weight: 600;          /* optional: make it bold */
-  margin-left: 4px;          /* small space from question */
+  color: #6c63ff;
+  text-decoration: none;
+  font-weight: 600;
+  margin-left: 4px;
   transition: color 0.3s;
 }
 
 .login-text a:hover {
-  color: #4b45c3;            /* darker on hover */
-  text-decoration: underline; /* optional hover effect */
+  color: #4b45c3;
+  text-decoration: underline;
 }
 
 .divider{
@@ -145,4 +129,24 @@ body {
 .social-btn.apple:hover {
   background-color: #808080;
   border: 1px solid #000000;
+}
+
+.in-group {
+  position: relative;
+  margin-bottom: 15px;
+}
+
+.in-group label {
+  position: absolute;
+  top: 6px;
+  left: 15px;
+  font-size: 12px;
+  color: #808080;
+  background: white;
+  padding: 0 5px;
+  pointer-events: none;
+}
+
+.in-group input {
+  padding-top: 20px;
 }
