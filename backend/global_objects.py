@@ -39,6 +39,8 @@ ADMIN_SESSION_NAME : str = "admin"
 USER_CREATION_REQ_FORM_KEYS : Tuple[str] = ('email', 'phone_num', 'country', 'birthdate', 'gender')
 USER_EDITING_REQ_FORM_KEYS : Tuple[str] = ('phone_num', 'country', 'birthdate', 'gender')
 
+EMAIL_CONFIRMATION_SALT : str = "confemailnigga"
+
 principals = Principal()
 admin_role = RoleNeed('admin')
 admin_permission = Permission(admin_role)

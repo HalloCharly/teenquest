@@ -20,3 +20,10 @@ PERMANENT_SESSION_LIFETIME = timedelta(weeks=5)
 
 REMEMBER_COOKIE_REFRESH_EACH_REQUEST = True
 SESSION_REFRESH_EACH_REQUEST = True
+
+MAIL_SERVER = 'smtp.office365.com'
+MAIL_PORT = 587
+MAIL_USE_TLS = True
+MAIL_USE_SSL = False
+MAIL_USERNAME = "teenquest.production@outlook.com"
+MAIL_PASSWORD = "pendulum1234"

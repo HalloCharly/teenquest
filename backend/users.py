@@ -1,22 +1,27 @@
 #Imports
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta  
 from enum import Enum
 from typing import Any, Dict, List, Tuple
-from flask import Flask, session, Request
+from flask import Flask, render_template, session, Request, url_for
 import passwords
 import phonenumbers
 from phonenumbers import NumberParseException, PhoneNumber, PhoneNumberFormat
 from email_validator import EmailNotValidError, EmailSyntaxError, validate_email 
 from flask_login import UserMixin, login_user, current_user
+from flask_mail import Mail, Message
 from sqlalchemy.orm import sessionmaker, Session, Query
 import global_objects
 from global_objects import db, login_manager, Gender
 from sqlalchemy_utils import EmailType, CountryType, PhoneNumberType, Country
 from flask_principal import identity_changed, UserNeed, Identity, identity_loaded
+from itsdangerous import URLSafeTimedSerializer
 
 #handles user validation, and user db operations(add, edit, delete)
 
 app : Flask
+
+sessionmaker_jobtaker : sessionmaker
+sessionmaker_jobtaker : sessionmaker
 
 def init_module(application):
     #initializes the users module
@@ -44,7 +49,9 @@ def user_model_factory(bind_key, _roles):
         country = db.Column(CountryType, nullable=False)
         city = db.Column(db.String(40), nullable=False)
         birth_date = db.Column(db.DateTime, default=datetime.min, nullable=False)
-        date_time_created = db.Column(db.DateTime, default=datetime.now(timezone.utc).astimezone(), nullable=False)
+        time_registered = db.Column(db.DateTime, default=datetime.now(timezone.utc).astimezone(), nullable=False)
+        confirmation_email_id = db.Column(db.Integer, nullable=True)
+        time_confirmed = db.Column(db.DateTime, nullable=True)
         rating_avg = db.Column(db.Integer, nullable=True)
         rating_count = db.Column(db.Integer, nullable=True)
         gender = db.Column(db.Enum(Gender), nullable=False)
@@ -65,7 +72,21 @@ def user_model_factory(bind_key, _roles):
 
         def __repr__(self) -> str:
             return f"""User{'\n'}{self.id}{'\n'}{self.first_name}{'\n'}{self.last_name}{'\n'}{self.email}{'\n'}{self.phone_number}{'\n'}{self.country}{'\n'}{self.city}{'\n'}
-        {self.birth_date}{'\n'}{self.date_time_created}{'\n'}{self.rating_avg}{'\n'}{self.job_ammount_done}{'\n'}{self.gender}{'\n'}{self.pronouns}{'\n'}"""
+        {self.birth_date}{'\n'}{self.time_registered}{'\n'}{self.confirmation_email_id}{'\n'}{self.time_confirmed}{'\n'}{self.rating_avg}{'\n'}{self.job_ammount_done}{'\n'}{self.gender}{'\n'}{self.pronouns}{'\n'}"""
+        
+        def confirm_registration(self, db_session : Session | None = None, commit : bool = True) -> bool:
+            if self.time_confirmed != None:
+                return False
+            if self == global_objects.admin:
+                return False
+            db_was_empty = db_session == None
+            if db_was_empty:
+                db_session = get_user_session(self.__bind_key__ == global_objects.JOBTAKERS_BINDKEY)
+                db_session.begin()
+            self.time_confirmed = datetime.now(timezone.utc).astimezone()
+            if db_was_empty or commit:
+                db_session.commit()
+            return True
         
         def change_rating(self, rating : int, db_session : Session | None = None, commit : bool = True) -> bool:
             if self == global_objects.admin:
@@ -285,6 +306,7 @@ def validate_user_request(request : Request, keys : List[str], check_email_deliv
                     output['gender'] = Gender(int(request.form['gender']))
                 except:
                     return handle_error(e)
+    output['city'] = request.form['city']
     return (True, output)
 
 def verify_login_attempt(request : Request, is_jobtaker : bool) -> bool:#request.form should contain a password and an email
@@ -316,8 +338,9 @@ def verify_admin_login_attempt(password) -> bool:
     else:
         return False
 
-def create_account(request : Request, is_jobtaker : bool) -> bool:#request.form should contain account data and a password
+def registed_user_account(request : Request, is_jobtaker : bool, confirmation_email : bool = True) -> bool:#request.form should contain account data and a password
     #validates, creates and adds a user+psswrd to the dbs from a user request
+    #this leaves the user acc as unverified, and will be deleted after some time
     #acc creation takes a while cuz we need to verify email deliverability
     (is_valid, formated_data) = validate_user_request(request, global_objects.USER_CREATION_REQ_FORM_KEYS, True)
     if not is_valid:
@@ -344,7 +367,56 @@ def create_account(request : Request, is_jobtaker : bool) -> bool:#request.form 
     if not passwords.add_user_password_to_db(user_id, request.form['password'], is_jobtaker):
         return False
     user_session.commit()#we commit it after adding the password, to avoid desync in case of failure to commit password
-    session['account_type'] = (lambda x : global_objects.JOBTAKER_SESSION_NAME if x else global_objects.JOBMAKER_SESSION_NAME)(is_jobtaker)
+    session['account_type'] = global_objects.JOBTAKER_SESSION_NAME if is_jobtaker else global_objects.JOBMAKER_SESSION_NAME
+    result = send_confirmation_email(user, is_jobtaker)
+    return result
+
+def send_confirmation_email(user, is_jobtaker : bool) -> bool:#expects user to exist in db
+    db_session = get_user_session(is_jobtaker)
+    db_session.begin()
+    if user.confirmation_email_id is None:
+        user.confirmation_email_id = 0
+    else:
+        user.confirmation_email_id += 1
+    if user.confirmation_email_id >= 200: #you wont need more than 200 conf emails
+        return False
+    serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+    token = serializer.dumps({"id" : user.id, "is_jobtaker" : is_jobtaker, "confirmation_email_id" : user.confirmation_email_id}, salt=global_objects.EMAIL_CONFIRMATION_SALT)
+    
+    mail = Mail(app)
+    msg = Message(subject="Teenquest Email Confirmation", sender=app.config["MAIL_USERNAME"], recipients=[user.email])
+    url = url_for('confirm_account', token=token, _external = True)
+    msg.html = render_template("/email_templates/confirmation_email.html", confirmation_url=url)
+    mail.send(msg)
+    print("send")
+    db_session.commit()
+    return True
+
+def confirm_user_account(token : str, expiration_time : int = 3600) -> Any | None:
+    try:
+        user_data = URLSafeTimedSerializer(app.config['SECRET_KEY']).loads(token, salt=global_objects.EMAIL_CONFIRMATION_SALT, max_age=expiration_time)
+        search = get_user_by_id(int(user_data["id"]), bool(user_data["is_jobtaker"]))
+        if search == None:
+            return None
+        if search[0].confirmation_email_id != int(user_data["confirmation_email_id"]):
+            return None
+        return search[1].first() if search[1].first().confirm_registration(search[0]) else None #this is the most pythonic shit ever
+    except:
+        return None
+    
+def delete_unconfirmed_users() -> bool:
+    print("deleting unconf users")
+    i = 0
+    while i < 2:#i = 0 checks jobmakers and i = 1 checks jobtakers
+        user_type = get_user_type(bool(i))
+        db_session = get_user_session(bool(i))
+        query = db_session.query(user_type).filter(
+            user_type.time_confirmed is None,
+            datetime.now(timezone.utc).astimezone() - user_type.time_registered > timedelta(days=3))
+        print(f"wiped {query.count()} {"jobtakers" if bool(i) else "jobmakers"}")
+        query.delete()
+        db_session.commit()
+        i += 1
     return True
 
 @identity_loaded.connect

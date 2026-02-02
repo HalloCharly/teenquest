@@ -1,13 +1,16 @@
 #Imports
-import global_objects as global_objects
 from datetime import datetime, timezone
+import sys
+import global_objects
 
 from passwords import (init_module as password_init_module)
 from users import (init_module as user_init_module,
                    verify_login_attempt as user_verify_login_attempt,
-                   create_account as user_create_account,
+                   registed_user_account,
                    verify_admin_login_attempt as user_verify_admin_login,
-                   get_user_by_id)
+                   delete_unconfirmed_users,
+                   confirm_user_account,
+                   send_confirmation_email as user_send_confirmation_email)
 from jobs import (init_module as job_init_module,
                   create_job,
                   get_job_by_id)
@@ -22,7 +25,8 @@ from flask import Flask, flash, render_template, redirect, request, session, url
 from sqlalchemy.orm import sessionmaker
 from flask_login import current_user, login_required, logout_user
 from flask_principal import identity_changed, AnonymousIdentity
-import sys
+from apscheduler.schedulers.background import BackgroundScheduler as BGScheduler
+import atexit
 
 #main app file
 
@@ -35,6 +39,12 @@ if global_objects.testing : #you can now decide what templates the app uses base
     app.template_folder = '../test_html'
 else:
     app.template_folder = '../app/'
+
+#Scheduler
+scheduler = BGScheduler(daemon=True)
+scheduler.add_job(func=delete_unconfirmed_users, trigger='interval', hours=2)
+scheduler.start()
+atexit.register(lambda: scheduler.shutdown())
 
 @app.before_request
 def session_permanence_handler():
@@ -118,6 +128,20 @@ def delete():
     session['account_type'] = global_objects.ANONYMOUS_SESSION_NAME
     return redirect(url_for("index_page"))
 
+@app.route('/resend', methods=["POST"])
+@login_required
+def resend():
+    user = current_user
+    print(user_send_confirmation_email(user, user.__bind_key__ == global_objects.JOBTAKERS_BINDKEY))
+    return redirect(url_for("index_page"))
+
+@app.route('/confirm/<token>', methods=["GET"])
+def confirm_account(token):
+    user = confirm_user_account(token)
+    if user == None:
+        print("piss urself")
+        return "Invalid or expired link.", 400
+    return "Email verified successfully!"
 
 
 #JobTaker account management
@@ -148,7 +172,7 @@ def edit_account_jobtaker():
 @app.route("/jobtaker/create", methods=["GET", "POST"])
 def create_account_jobtaker():
     if(request.method == "POST"):
-        if(user_create_account(request, True)):
+        if(registed_user_account(request, True)):
             return redirect(url_for("login_jobtaker"))
         else:
             return redirect(url_for("create_account_jobtaker")), 404
@@ -185,7 +209,7 @@ def edit_account_jobmaker():
 @app.route("/jobmaker/create", methods=["GET", "POST"])
 def create_account_jobmaker():
     if(request.method == "POST"):
-        if(user_create_account(request, False)):
+        if(registed_user_account(request, False)):
             return redirect(url_for("login_jobmaker"))
         else:
             return redirect(url_for("create_account_jobmaker")), 404
