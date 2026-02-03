@@ -3,14 +3,14 @@ from datetime import timedelta
 
 SECRET_KEY = "epstein grape chiggers"
 
-SQLALCHEMY_DATABASE_URI = "sqlite:///jobs.db"
+SQLALCHEMY_DATABASE_URI = "postgresql+psycopg://postgres:Kutas001@localhost:5432/jobs"
 SQLALCHEMY_BINDS = {
-    JOBTAKERS_BINDKEY: "sqlite:///users.db",
-    JOBMAKERS_BINDKEY: "sqlite:///users.db",
-    JOBTAKER_PASSWORDS_BINDKEY: "sqlite:///passwords.db",
-    JOBMAKER_PASSWORDS_BINDKEY: "sqlite:///passwords.db",
-    JOBS_BINDKEY: "sqlite:///jobs.db",
-    LOGS_BINDKEY: "sqlite:///logs.db"
+    JOBTAKERS_BINDKEY: "postgresql+psycopg://postgres:Kutas001@localhost:5432/users",
+    JOBMAKERS_BINDKEY: "postgresql+psycopg://postgres:Kutas001@localhost:5432/users",
+    JOBTAKER_PASSWORDS_BINDKEY: "postgresql+psycopg://postgres:Kutas001@localhost:5432/passwords",
+    JOBMAKER_PASSWORDS_BINDKEY: "postgresql+psycopg://postgres:Kutas001@localhost:5432/passwords",
+    JOBS_BINDKEY: "postgresql+psycopg://postgres:Kutas001@localhost:5432/jobs",
+    LOGS_BINDKEY: "postgresql+psycopg://postgres:Kutas001@localhost:5432/logs"
 }
 
 SQLALCHEMY_TRACK_MODIFICATIONS = False

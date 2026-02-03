@@ -11,7 +11,8 @@ from users import (init_module as user_init_module,
                    verify_admin_login_attempt as user_verify_admin_login,
                    delete_unconfirmed_users,
                    confirm_user_account,
-                   send_confirmation_email as user_send_confirmation_email)
+                   send_confirmation_email as user_send_confirmation_email,
+                   get_user_by_id)
 from jobs import (init_module as job_init_module,
                   create_job,
                   get_job_by_id)
@@ -27,6 +28,7 @@ from sqlalchemy.orm import sessionmaker
 from flask_login import current_user, login_required, logout_user
 from apscheduler.schedulers.background import BackgroundScheduler as BGScheduler
 from flask_principal import identity_changed, AnonymousIdentity
+from flask_migrate import Migrate
 
 #main app file
 
@@ -40,21 +42,17 @@ if global_objects.testing : #you can now decide what templates the app uses base
 else:
     app.template_folder = '../app/'
 
-#Scheduler
-scheduler = BGScheduler(daemon=True)
-scheduler.add_job(func=delete_unconfirmed_users, trigger='interval', hours=2)
-scheduler.start()
-register_atexit(scheduler.shutdown)
-
 @app.before_request
 def session_permanence_handler():
     #Makes the session impermanet if an admin acc is logged in
     session.permanent = session.get('account_type') != global_objects.ADMIN_SESSION_NAME
 
 login_manager.init_app(app)
+login_manager.login_view = 'login'
 
 #Db setup
 db.init_app(app)
+migrate = Migrate(app, db)
 
 #initialize all of the modules
 global_objects_init_module(app)
@@ -62,13 +60,19 @@ user_init_module(app)
 password_init_module(app)
 job_init_module(app)
     
+#Scheduler
+scheduler = BGScheduler(daemon=True)
+scheduler.add_job(func= lambda : delete_unconfirmed_users(), trigger='interval', seconds=10)
+scheduler.start()
+register_atexit(scheduler.shutdown)
+
 class Log(db.Model):
     __bind_key__ = global_objects.LOGS_BINDKEY
-    id = db.Column(db.Integer, primary_key=True)
-    sender_id = db.Column(db.Integer, nullable=False) #we set the ids to positive if its a jbmaker, and negative if its a jbtaker
-    recipient_id = db.Column(db.Integer, nullable=False)
-    date_time_sent = db.Column(db.DateTime, default=datetime.now(timezone.utc).astimezone(), nullable=False)
-    content = db.Column(db.String, nullable=False)
+    id = db.Column(db.Integer(), primary_key=True)
+    sender_id = db.Column(db.Integer(), nullable=False) #we set the ids to positive if its a jbmaker, and negative if its a jbtaker
+    recipient_id = db.Column(db.Integer(), nullable=False)
+    date_time_sent = db.Column(db.DateTime(), default=datetime.now(timezone.utc).astimezone(), nullable=False)
+    content = db.Column(db.String(), nullable=False)
     
     def __init__(self, sender_id, recipient_id, date_time_sent, content):
         self.sender_id = sender_id
@@ -93,7 +97,6 @@ with app.app_context():
 
 
 
-
 #Main navigation
 @app.route("/", methods=["GET"])
 def index_page():
@@ -107,6 +110,7 @@ def login_page():
 
 #General Utilities
 @app.route('/logout', methods=["GET"])
+@login_required
 def logout():
     logout_user()
     for key in ('identity.name', 'identity.auth_type'):
@@ -118,8 +122,13 @@ def logout():
 @app.route('/delete', methods=["GET"])
 @login_required
 def delete():
-    user = current_user
-    user.delete_account()
+    if current_user == None:
+        return redirect(url_for("index_page"))
+    search = get_user_by_id(current_user.id, session['account_type'] == global_objects.JOBTAKER_SESSION_NAME)
+    if search == None:
+        return redirect(url_for("index_page"))
+    user = search[1].first()
+    user.delete_account(search[0])
     print(user.first_name)
     logout_user()
     for key in ('identity.name', 'identity.auth_type'):
@@ -132,7 +141,20 @@ def delete():
 @login_required
 def resend():
     user = current_user
-    print(user_send_confirmation_email(user.id, user.__bind_key__ == global_objects.JOBTAKERS_BINDKEY))
+    result = user_send_confirmation_email(user.id, user.__bind_key__ == global_objects.JOBTAKERS_BINDKEY)
+    if isinstance(result, str):
+        return redirect(result)
+    else:
+        print(result)
+    return redirect(url_for("index_page"))
+
+@app.route('/wipecondate') #used only for test
+@login_required
+def wipecondate():
+    user = current_user
+    result = user.revoke_registration()
+    print(result)
+    print(f"{type(current_user.time_confirmed)} {current_user.time_confirmed}")
     return redirect(url_for("index_page"))
 
 @app.route('/confirm/<token>', methods=["GET"])
@@ -144,7 +166,6 @@ def confirm_account(token):
     (_, is_jobtaker) = result
     refresh_arg = {"Refresh" : f"3, url={ url_for(f'login_{'jobtaker' if is_jobtaker else 'jobmaker'}')}"}
     return "Email verified successfully!", refresh_arg
-
 
 #JobTaker account management
 @app.route("/jobtaker/login", methods=["GET", "POST"])
@@ -174,7 +195,11 @@ def edit_account_jobtaker():
 @app.route("/jobtaker/create", methods=["GET", "POST"])
 def create_account_jobtaker():
     if(request.method == "POST"):
-        if(register_user_account(request, True)):
+        result = register_user_account(request, True)
+        if isinstance(result, str):
+            print(result)
+            return redirect(url_for("login_jobtaker"))
+        elif result:
             return redirect(url_for("login_jobtaker"))
         else:
             return redirect(url_for("create_account_jobtaker")), 404
@@ -211,7 +236,11 @@ def edit_account_jobmaker():
 @app.route("/jobmaker/create", methods=["GET", "POST"])
 def create_account_jobmaker():
     if(request.method == "POST"):
-        if(register_user_account(request, False)):
+        result = register_user_account(request, False)
+        if isinstance(result, str):
+            print(result)
+            return redirect(url_for("login_jobmaker"))
+        elif result:
             return redirect(url_for("login_jobmaker"))
         else:
             return redirect(url_for("create_account_jobmaker")), 404
@@ -397,8 +426,8 @@ def jobmarket_jobmaker_delete_job():
     
 #Error handlers
 @login_manager.unauthorized_handler #User can both lack perms or not be logged in, so we check for both
-def unauthorized_handler(e):
-    return Unathorized(e)
+def unauthorized_handler():
+    return Unathorized("")
 
 @app.errorhandler(401)
 def Unathorized(e):
@@ -411,4 +440,4 @@ def Not_Found(e):
     return "Didn found that" #Todo:put a actual page here
     
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False)
