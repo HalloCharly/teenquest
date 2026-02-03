@@ -1,12 +1,13 @@
 #Imports
 from datetime import datetime, timezone
 import sys
+from atexit import register as register_atexit
 import global_objects
 
 from passwords import (init_module as password_init_module)
 from users import (init_module as user_init_module,
                    verify_login_attempt as user_verify_login_attempt,
-                   registed_user_account,
+                   register_user_account,
                    verify_admin_login_attempt as user_verify_admin_login,
                    delete_unconfirmed_users,
                    confirm_user_account,
@@ -24,9 +25,8 @@ from global_objects import (db,
 from flask import Flask, flash, render_template, redirect, request, session, url_for
 from sqlalchemy.orm import sessionmaker
 from flask_login import current_user, login_required, logout_user
-from flask_principal import identity_changed, AnonymousIdentity
 from apscheduler.schedulers.background import BackgroundScheduler as BGScheduler
-import atexit
+from flask_principal import identity_changed, AnonymousIdentity
 
 #main app file
 
@@ -44,7 +44,7 @@ else:
 scheduler = BGScheduler(daemon=True)
 scheduler.add_job(func=delete_unconfirmed_users, trigger='interval', hours=2)
 scheduler.start()
-atexit.register(lambda: scheduler.shutdown())
+register_atexit(scheduler.shutdown)
 
 @app.before_request
 def session_permanence_handler():
@@ -128,20 +128,22 @@ def delete():
     session['account_type'] = global_objects.ANONYMOUS_SESSION_NAME
     return redirect(url_for("index_page"))
 
-@app.route('/resend', methods=["POST"])
+@app.route('/resend', methods=["GET"])
 @login_required
 def resend():
     user = current_user
-    print(user_send_confirmation_email(user, user.__bind_key__ == global_objects.JOBTAKERS_BINDKEY))
+    print(user_send_confirmation_email(user.id, user.__bind_key__ == global_objects.JOBTAKERS_BINDKEY))
     return redirect(url_for("index_page"))
 
 @app.route('/confirm/<token>', methods=["GET"])
 def confirm_account(token):
-    user = confirm_user_account(token)
-    if user == None:
-        print("piss urself")
-        return "Invalid or expired link.", 400
-    return "Email verified successfully!"
+    result = confirm_user_account(token)
+    if isinstance(result, int):
+        print(f"code '{result}' while confirming")
+        return f"Invalid or expired link. ({result})", 400
+    (_, is_jobtaker) = result
+    refresh_arg = {"Refresh" : f"3, url={ url_for(f'login_{'jobtaker' if is_jobtaker else 'jobmaker'}')}"}
+    return "Email verified successfully!", refresh_arg
 
 
 #JobTaker account management
@@ -172,7 +174,7 @@ def edit_account_jobtaker():
 @app.route("/jobtaker/create", methods=["GET", "POST"])
 def create_account_jobtaker():
     if(request.method == "POST"):
-        if(registed_user_account(request, True)):
+        if(register_user_account(request, True)):
             return redirect(url_for("login_jobtaker"))
         else:
             return redirect(url_for("create_account_jobtaker")), 404
@@ -209,7 +211,7 @@ def edit_account_jobmaker():
 @app.route("/jobmaker/create", methods=["GET", "POST"])
 def create_account_jobmaker():
     if(request.method == "POST"):
-        if(registed_user_account(request, False)):
+        if(register_user_account(request, False)):
             return redirect(url_for("login_jobmaker"))
         else:
             return redirect(url_for("create_account_jobmaker")), 404

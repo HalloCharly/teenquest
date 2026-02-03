@@ -14,7 +14,7 @@ import global_objects
 from global_objects import db, login_manager, Gender
 from sqlalchemy_utils import EmailType, CountryType, PhoneNumberType, Country
 from flask_principal import identity_changed, UserNeed, Identity, identity_loaded
-from itsdangerous import URLSafeTimedSerializer
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 #handles user validation, and user db operations(add, edit, delete)
 
@@ -338,7 +338,7 @@ def verify_admin_login_attempt(password) -> bool:
     else:
         return False
 
-def registed_user_account(request : Request, is_jobtaker : bool, confirmation_email : bool = True) -> bool:#request.form should contain account data and a password
+def register_user_account(request : Request, is_jobtaker : bool, confirmation_email : bool = True) -> bool:#request.form should contain account data and a password
     #validates, creates and adds a user+psswrd to the dbs from a user request
     #this leaves the user acc as unverified, and will be deleted after some time
     #acc creation takes a while cuz we need to verify email deliverability
@@ -368,17 +368,14 @@ def registed_user_account(request : Request, is_jobtaker : bool, confirmation_em
         return False
     user_session.commit()#we commit it after adding the password, to avoid desync in case of failure to commit password
     session['account_type'] = global_objects.JOBTAKER_SESSION_NAME if is_jobtaker else global_objects.JOBMAKER_SESSION_NAME
-    result = send_confirmation_email(user, is_jobtaker)
+    result = send_confirmation_email(user.id, is_jobtaker)
     return result
 
-def send_confirmation_email(user, is_jobtaker : bool) -> bool:#expects user to exist in db
-    db_session = get_user_session(is_jobtaker)
-    db_session.begin()
-    if user.confirmation_email_id is None:
-        user.confirmation_email_id = 0
-    else:
-        user.confirmation_email_id += 1
-    if user.confirmation_email_id >= 200: #you wont need more than 200 conf emails
+def send_confirmation_email(user_id : int, is_jobtaker : bool) -> bool:#expects user to exist in db
+    (db_session, query) = get_user_by_id(user_id, is_jobtaker)
+    user = query.first()
+    user.confirmation_email_id = 0 if user.confirmation_email_id is None else user.confirmation_email_id + 1
+    if user.confirmation_email_id >= 5: #you wont need more than 5 conf emails
         return False
     serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
     token = serializer.dumps({"id" : user.id, "is_jobtaker" : is_jobtaker, "confirmation_email_id" : user.confirmation_email_id}, salt=global_objects.EMAIL_CONFIRMATION_SALT)
@@ -388,21 +385,34 @@ def send_confirmation_email(user, is_jobtaker : bool) -> bool:#expects user to e
     url = url_for('confirm_account', token=token, _external = True)
     msg.html = render_template("/email_templates/confirmation_email.html", confirmation_url=url)
     mail.send(msg)
-    print("send")
     db_session.commit()
     return True
 
-def confirm_user_account(token : str, expiration_time : int = 3600) -> Any | None:
+def confirm_user_account(token : str, expiration_time : int = 3600) -> Tuple[Any, bool] | int:
+    #returns the user or a status code,
+    #User is success
+    #0 is failure to find user
+    #1 is a wrong email id (newer token exists)
+    #2 is a failure to confirm user reg
+    #3 is signature expired (token to old)
+    #4 is bad signature
     try:
         user_data = URLSafeTimedSerializer(app.config['SECRET_KEY']).loads(token, salt=global_objects.EMAIL_CONFIRMATION_SALT, max_age=expiration_time)
-        search = get_user_by_id(int(user_data["id"]), bool(user_data["is_jobtaker"]))
-        if search == None:
-            return None
-        if search[0].confirmation_email_id != int(user_data["confirmation_email_id"]):
-            return None
-        return search[1].first() if search[1].first().confirm_registration(search[0]) else None #this is the most pythonic shit ever
-    except:
-        return None
+        print(user_data)
+        search = get_user_by_id(user_data["id"], user_data["is_jobtaker"])
+        if search is None:
+            return 0
+        (db_session, query) = search
+        if query.first().confirmation_email_id != user_data["confirmation_email_id"]:
+            return 1
+        result = query.first().confirm_registration(db_session)
+        if not result:
+            return 2
+        return (query.first(), user_data["is_jobtaker"]) #this is the most pythonic shit ever
+    except SignatureExpired:
+        return 3
+    except BadSignature:
+        return 4
     
 def delete_unconfirmed_users() -> bool:
     print("deleting unconf users")
