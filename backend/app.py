@@ -1,50 +1,78 @@
 #Imports
-import global_objects as global_objects
 from datetime import datetime, timezone
+import sys
+from atexit import register as register_atexit
+import global_objects
 
-import passwords
+from passwords import (init_module as password_init_module)
 from users import (init_module as user_init_module,
-                   validate_login_attempt as user_validate_login_attempt,
-                   create_account as user_create_account,
-                   validate_admin_login as user_validate_admin_login,
-                   on_identity_loaded as user_on_identity_loaded,
+                   verify_login_attempt as user_verify_login_attempt,
+                   register_user_account,
+                   verify_admin_login_attempt as user_verify_admin_login,
+                   delete_unconfirmed_users,
+                   confirm_user_account,
+                   send_confirmation_email as user_send_confirmation_email,
                    get_user_by_id)
-import jobs
-from global_objects import db, login_manager, admin_permission, jobtaker_permission, jobmaker_permission, JobState
+from jobs import (init_module as job_init_module,
+                  create_job,
+                  get_job_by_id)
+from global_objects import (db,
+                            login_manager,
+                            admin_permission,
+                            jobtaker_permission,
+                            jobmaker_permission,
+                            JobState,
+                            init_module as global_objects_init_module)
 from flask import Flask, flash, render_template, redirect, request, session, url_for
 from sqlalchemy.orm import sessionmaker
 from flask_login import current_user, login_required, logout_user
-from flask_principal import identity_changed, AnonymousIdentity, identity_loaded
+from apscheduler.schedulers.background import BackgroundScheduler as BGScheduler
+from flask_principal import identity_changed, AnonymousIdentity
+from flask_migrate import Migrate
 
 #main app file
 
 #App
-app = Flask(__name__, template_folder='../app/') #changed it to the app (christian)
+app = Flask(__name__)
 
 app.config.from_pyfile('./flask_config.py')
+global_objects.testing = sys.argv[1] == "Test" if 1 < len(sys.argv) else False
+if global_objects.testing : #you can now decide what templates the app uses based on if y run it /w Test as the first arg
+    app.template_folder = '../test_html'
+else:
+    app.template_folder = '../app/'
 
 @app.before_request
-def make_session_permanent():
+def session_permanence_handler():
+    #Makes the session impermanet if an admin acc is logged in
     session.permanent = session.get('account_type') != global_objects.ADMIN_SESSION_NAME
 
 login_manager.init_app(app)
+login_manager.login_view = 'login'
 
 #Db setup
 db.init_app(app)
+migrate = Migrate(app, db)
 
 #initialize all of the modules
-global_objects.init_module(app)
+global_objects_init_module(app)
 user_init_module(app)
-passwords.init_module(app)
-jobs.init_module(app)
+password_init_module(app)
+job_init_module(app)
     
+#Scheduler
+scheduler = BGScheduler(daemon=True)
+scheduler.add_job(func= lambda : delete_unconfirmed_users(), trigger='interval', seconds=10)
+scheduler.start()
+register_atexit(scheduler.shutdown)
+
 class Log(db.Model):
     __bind_key__ = global_objects.LOGS_BINDKEY
-    id = db.Column(db.Integer, primary_key=True)
-    sender_id = db.Column(db.Integer, nullable=False) #we set the ids to positive if its a jbmaker, and negative if its a jbtaker
-    recipient_id = db.Column(db.Integer, nullable=False)
-    date_time_sent = db.Column(db.DateTime, default=datetime.now(timezone.utc).astimezone(), nullable=False)
-    content = db.Column(db.String, nullable=False)
+    id = db.Column(db.Integer(), primary_key=True)
+    sender_id = db.Column(db.Integer(), nullable=False) #we set the ids to positive if its a jbmaker, and negative if its a jbtaker
+    recipient_id = db.Column(db.Integer(), nullable=False)
+    date_time_sent = db.Column(db.DateTime(), default=datetime.now(timezone.utc).astimezone(), nullable=False)
+    content = db.Column(db.String(), nullable=False)
     
     def __init__(self, sender_id, recipient_id, date_time_sent, content):
         self.sender_id = sender_id
@@ -69,7 +97,6 @@ with app.app_context():
 
 
 
-
 #Main navigation
 @app.route("/", methods=["GET"])
 def index_page():
@@ -83,6 +110,7 @@ def login_page():
 
 #General Utilities
 @app.route('/logout', methods=["GET"])
+@login_required
 def logout():
     logout_user()
     for key in ('identity.name', 'identity.auth_type'):
@@ -94,8 +122,13 @@ def logout():
 @app.route('/delete', methods=["GET"])
 @login_required
 def delete():
-    user = current_user
-    user.delete_account()
+    if current_user == None:
+        return redirect(url_for("index_page"))
+    search = get_user_by_id(current_user.id, session['account_type'] == global_objects.JOBTAKER_SESSION_NAME)
+    if search == None:
+        return redirect(url_for("index_page"))
+    user = search[1].first()
+    user.delete_account(search[0])
     print(user.first_name)
     logout_user()
     for key in ('identity.name', 'identity.auth_type'):
@@ -104,17 +137,45 @@ def delete():
     session['account_type'] = global_objects.ANONYMOUS_SESSION_NAME
     return redirect(url_for("index_page"))
 
+@app.route('/resend', methods=["GET"])
+@login_required
+def resend():
+    user = current_user
+    result = user_send_confirmation_email(user.id, user.__bind_key__ == global_objects.JOBTAKERS_BINDKEY)
+    if isinstance(result, str):
+        return redirect(result)
+    else:
+        print(result)
+    return redirect(url_for("index_page"))
 
+@app.route('/wipecondate') #used only for test
+@login_required
+def wipecondate():
+    user = current_user
+    result = user.revoke_registration()
+    print(result)
+    print(f"{type(current_user.time_confirmed)} {current_user.time_confirmed}")
+    return redirect(url_for("index_page"))
+
+@app.route('/confirm/<token>', methods=["GET"])
+def confirm_account(token):
+    result = confirm_user_account(token)
+    if isinstance(result, int):
+        print(f"code '{result}' while confirming")
+        return f"Invalid or expired link. ({result})", 400
+    (_, is_jobtaker) = result
+    refresh_arg = {"Refresh" : f"3, url={ url_for(f'login_{'jobtaker' if is_jobtaker else 'jobmaker'}')}"}
+    return "Email verified successfully!", refresh_arg
 
 #JobTaker account management
 @app.route("/jobtaker/login", methods=["GET", "POST"])
 def login_jobtaker():
     if(request.method == "POST"):
-        if(user_validate_login_attempt(request, True)):
+        if(user_verify_login_attempt(request, True)):
             return redirect(url_for('jobmarket_jobtaker_page'))
         else:
             flash("looser", "error")
-            return render_template("login_jobtaker.html"), 401
+            return render_template("login_jobtaker.html"), 404
     else:
         return render_template("login_jobtaker.html")
 
@@ -127,17 +188,21 @@ def edit_account_jobtaker():
             return redirect(url_for('jobmarket_jobtaker_page'))
         else:
             flash("looser", "error")
-            return render_template("edit_jobtaker.html"), 401
+            return render_template("edit_jobtaker.html"), 404
     else:
         return render_template("edit_jobtaker.html")
     
 @app.route("/jobtaker/create", methods=["GET", "POST"])
 def create_account_jobtaker():
     if(request.method == "POST"):
-        if(user_create_account(request, True)):
+        result = register_user_account(request, True)
+        if isinstance(result, str):
+            print(result)
+            return redirect(url_for("login_jobtaker"))
+        elif result:
             return redirect(url_for("login_jobtaker"))
         else:
-            return redirect(url_for("create_account_jobtaker")), 401
+            return redirect(url_for("create_account_jobtaker")), 404
     else:
         return render_template("create_jobtaker.html")
 
@@ -147,11 +212,11 @@ def create_account_jobtaker():
 @app.route("/jobmaker/login", methods=["GET", "POST"])
 def login_jobmaker():
     if(request.method == "POST"):
-        if(user_validate_login_attempt(request, False)):
+        if(user_verify_login_attempt(request, False)):
             return redirect(url_for('jobmarket_jobmaker_page'))
         else:
             flash("looser", "error")
-            return render_template("login_jobmaker.html"), 401
+            return render_template("login_jobmaker.html"), 404
     else:
         return render_template("login_jobmaker.html")
     
@@ -164,17 +229,21 @@ def edit_account_jobmaker():
             return redirect(url_for('jobmarket_jobmaker_page'))
         else:
             flash("looser", "error")
-            return render_template("edit_jobmaker.html"), 401
+            return render_template("edit_jobmaker.html"), 404
     else:
         return render_template("edit_jobmaker.html")
 
 @app.route("/jobmaker/create", methods=["GET", "POST"])
 def create_account_jobmaker():
     if(request.method == "POST"):
-        if(user_create_account(request, False)):
+        result = register_user_account(request, False)
+        if isinstance(result, str):
+            print(result)
+            return redirect(url_for("login_jobmaker"))
+        elif result:
             return redirect(url_for("login_jobmaker"))
         else:
-            return redirect(url_for("create_account_jobmaker")), 401
+            return redirect(url_for("create_account_jobmaker")), 404
     else:
         return render_template("create_jobmaker.html")
 
@@ -184,10 +253,10 @@ def create_account_jobmaker():
 @app.route("/admin/login", methods=["GET", "POST"])
 def login_admin():
     if(request.method == "POST"):
-        if(user_validate_admin_login(request.form['password'])):
+        if(user_verify_admin_login(request.form['password'])):
             return redirect(url_for('navigation_admin_page'))
         else:
-            return render_template("login_admin.html"), 401
+            return render_template("login_admin.html"), 404
     else:
         return render_template("login_admin.html")
     
@@ -211,7 +280,7 @@ def jobmarket_jobtaker_page():
 @login_required
 def jobmarket_jobtaker_confirm():
     try:
-        search = jobs.get_job_by_id(int(request.form['job_id']))
+        search = get_job_by_id(int(request.form['job_id']))
     except ValueError as e:
         print(e)
         return render_template("take_job.html")
@@ -248,7 +317,7 @@ def jobmarket_jobtaker_confirm():
 @login_required
 def jobmarket_jobtaker_unconfirm():
     try:
-        search = jobs.get_job_by_id(int(request.form['job_id']))
+        search = get_job_by_id(int(request.form['job_id']))
     except ValueError as e:
         print(e)
         return render_template("take_job.html")
@@ -273,7 +342,7 @@ def jobmarket_jobmaker_page():
 @jobmaker_permission.require(http_exception=401)
 @login_required
 def jobmarket_jobmaker_create():
-    jobs.create_job(current_user, request)
+    create_job(current_user, request)
     return render_template("make_job.html")
 
 @app.route("/jobmaker/jobmarket/confirm", methods=["POST"])
@@ -281,7 +350,7 @@ def jobmarket_jobmaker_create():
 @login_required
 def jobmarket_jobmaker_confirm():
     try:
-        search = jobs.get_job_by_id(int(request.form['job_id']))
+        search = get_job_by_id(int(request.form['job_id']))
     except ValueError as e:
         print(e)
         return render_template("make_job.html")
@@ -312,7 +381,7 @@ def jobmarket_jobmaker_confirm():
 @login_required
 def jobmarket_jobmaker_edit():
     try:
-        search = jobs.get_job_by_id(int(request.form['job_id']))
+        search = get_job_by_id(int(request.form['job_id']))
     except ValueError as e:
         print(e)
         return render_template("make_job.html")
@@ -328,7 +397,7 @@ def jobmarket_jobmaker_edit():
 @login_required
 def jobmarket_jobmaker_deny_jobtaker():
     try:
-        search = jobs.get_job_by_id(int(request.form['job_id']))
+        search = get_job_by_id(int(request.form['job_id']))
     except ValueError as e:
         print(e)
         return render_template("make_job.html")
@@ -344,7 +413,7 @@ def jobmarket_jobmaker_deny_jobtaker():
 @login_required
 def jobmarket_jobmaker_delete_job():
     try:
-        search = jobs.get_job_by_id(int(request.form['job_id']))
+        search = get_job_by_id(int(request.form['job_id']))
     except ValueError as e:
         print(e)
         return render_template("make_job.html")
@@ -354,15 +423,21 @@ def jobmarket_jobmaker_delete_job():
     (db_session, query) = search
     query.first().delete_job(db_session)
     return render_template("make_job.html")
-
-
-@login_manager.unauthorized_handler
+    
+#Error handlers
+@login_manager.unauthorized_handler #User can both lack perms or not be logged in, so we check for both
 def unauthorized_handler():
-    return redirect(url_for("index_page"))
+    return Unathorized("")
 
-@identity_loaded.connect_via(app)
-def on_identity_loaded(sender, identity):
-    user_on_identity_loaded(sender, identity)
+@app.errorhandler(401)
+def Unathorized(e):
+    print(e)
+    return "Not Authorized ya dingus" #Todo:put a actual page here
+
+@app.errorhandler(404)
+def Not_Found(e):
+    print(e)
+    return "Didn found that" #Todo:put a actual page here
     
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False)

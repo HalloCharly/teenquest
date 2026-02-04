@@ -16,6 +16,7 @@ from users import get_user_by_id
 app : Flask
 
 sessionmaker_job : sessionmaker
+
 def init_module(application):
     #initializes the jobs module
     with application.app_context():
@@ -27,20 +28,20 @@ def init_module(application):
 
 class Job(db.Model):
     __bind_key__ = "jobs"
-    id = db.Column(db.Integer, primary_key=True)
-    jobtaker_id = db.Column(db.Integer, nullable=True)
-    jobmaker_id = db.Column(db.Integer, nullable=False)
-    jobmaker_rating = db.Column(db.Integer, nullable=True)
+    id = db.Column(db.Integer(), primary_key=True)
+    jobtaker_id = db.Column(db.Integer(), nullable=True)
+    jobmaker_id = db.Column(db.Integer(), nullable=False)
+    jobmaker_rating = db.Column(db.Integer(), nullable=True)
     job_state = db.Column(db.Enum(JobState), default=JobState.CREATED, nullable=False)
-    date_time_created = db.Column(db.DateTime, default=datetime.now(timezone.utc).astimezone(), nullable=False)
-    date_time_accepted_taker = db.Column(db.DateTime, nullable=True)
-    date_time_accepted_maker = db.Column(db.DateTime, nullable=True)
-    date_time_started = db.Column(db.DateTime, nullable=True)
-    date_time_ended = db.Column(db.DateTime, nullable=True)
-    date_time_payed = db.Column(db.DateTime, nullable=True)
+    date_time_created = db.Column(db.DateTime(), default=datetime.now(timezone.utc).astimezone(), nullable=False)
+    date_time_accepted_taker = db.Column(db.DateTime(), nullable=True)
+    date_time_accepted_maker = db.Column(db.DateTime(), nullable=True)
+    date_time_started = db.Column(db.DateTime(), nullable=True)
+    date_time_ended = db.Column(db.DateTime(), nullable=True)
+    date_time_payed = db.Column(db.DateTime(), nullable=True)
     job_type = db.Column(db.String(30), nullable=False)
-    date_time_scheduled_start = db.Column(db.DateTime, default=datetime.min, nullable=False) #schelduled = when the job should be started/ended (entered by jobmaker)
-    date_time_scheduled_end = db.Column(db.DateTime, default=datetime.min, nullable=False)
+    date_time_scheduled_start = db.Column(db.DateTime(), default=datetime.min, nullable=False) #schelduled = when the job should be started/ended (entered by jobmaker)
+    date_time_scheduled_end = db.Column(db.DateTime(), default=datetime.min, nullable=False)
     country = db.Column(CountryType, nullable=False)
     city = db.Column(db.String(200), nullable=False)
     zip_code = db.Column(db.String(20), nullable=False)
@@ -78,7 +79,7 @@ class Job(db.Model):
             db_session.begin()
         if self.job_state.value >= JobState.ACCEPTED_MAKER.value:#if job_state is alr accepted, block job editing
             return False
-        db_session.query(Job).filter(Job.id == self.id).update({
+        db_session.query(Job).filter(Job.id == int(self.id)).update({
             Job.job_type : request.form['job_type'],
             Job.date_time_scheduled_start : datetime.strptime(request.form['job_scheduled_start'], "%Y-%m-%dT%H:%M").astimezone(),
             Job.date_time_scheduled_end : datetime.strptime(request.form['job_scheduled_end'], "%Y-%m-%dT%H:%M").astimezone(),
@@ -192,7 +193,7 @@ def get_all_jobtaker_jobs(user) -> Tuple[Session, Query[Job]] | None:
         return None
     db_session : Session = sessionmaker_job()
     db_session.begin()
-    query = db_session.query(Job).filter(Job.jobmaker_id == user.id)
+    query = db_session.query(Job).filter(Job.jobmaker_id == int(user.id))
     if query.count() == 0:
         return None
     else:
@@ -204,7 +205,7 @@ def get_all_jobmaker_jobs(user) -> Tuple[Session, Query[Job]] | None:
         return None
     db_session : Session = sessionmaker_job()
     db_session.begin()
-    query = db_session.query(Job).filter(Job.jobmaker_id == user.id)
+    query = db_session.query(Job).filter(Job.jobmaker_id == int(user.id))
     if query.count() == 0:
         return None
     else:
@@ -214,7 +215,7 @@ def get_job_by_id(job_id : int) -> Tuple[Session, Query[Job]] | None:
     #gets job from db by id
     db_session : Session = sessionmaker_job()
     db_session.begin()
-    query = db_session.query(Job).filter(Job.id == job_id)
+    query = db_session.query(Job).filter(Job.id == int(job_id))
     if query.count() != 1:
         return None
     return (db_session, query)
@@ -243,7 +244,7 @@ def update_jobs_ratings(user) -> bool:
     if jobs == None:
         return False
     (db_session, query) = jobs
-    query.filter(Job.job_state != JobState.PAYED)
+    query.filter(Job.job_state != int(JobState.PAYED))
     query.update({Job.jobmaker_rating : user.rating_avg})
     db_session.commit()
     return True
