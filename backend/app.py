@@ -62,7 +62,7 @@ job_init_module(app)
     
 #Scheduler
 scheduler = BGScheduler(daemon=True)
-scheduler.add_job(func= lambda : delete_unconfirmed_users(), trigger='interval', seconds=10)
+scheduler.add_job(func= lambda : delete_unconfirmed_users(), trigger='interval', days=1)
 scheduler.start()
 register_atexit(scheduler.shutdown)
 
@@ -146,15 +146,6 @@ def resend():
         return redirect(result)
     else:
         print(result)
-    return redirect(url_for("index_page"))
-
-@app.route('/wipecondate') #used only for test
-@login_required
-def wipecondate():
-    user = current_user
-    result = user.revoke_registration()
-    print(result)
-    print(f"{type(current_user.time_confirmed)} {current_user.time_confirmed}")
     return redirect(url_for("index_page"))
 
 @app.route('/confirm/<token>', methods=["GET"])

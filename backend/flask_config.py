@@ -1,16 +1,16 @@
-from global_objects import JOBTAKERS_BINDKEY, JOBMAKERS_BINDKEY, JOBTAKER_PASSWORDS_BINDKEY, JOBMAKER_PASSWORDS_BINDKEY, JOBS_BINDKEY, LOGS_BINDKEY
+from global_objects import JOBTAKERS_BINDKEY, JOBMAKERS_BINDKEY, JOBTAKER_PASSWORDS_BINDKEY, JOBMAKER_PASSWORDS_BINDKEY, JOBS_BINDKEY, LOGS_BINDKEY, DB_PATH
 from datetime import timedelta
 
 SECRET_KEY = "epstein grape chiggers"
 
-SQLALCHEMY_DATABASE_URI = "postgresql+psycopg://postgres:Kutas001@localhost:5432/jobs"
+SQLALCHEMY_DATABASE_URI = f"{DB_PATH}jobs"
 SQLALCHEMY_BINDS = {
-    JOBTAKERS_BINDKEY: "postgresql+psycopg://postgres:Kutas001@localhost:5432/users",
-    JOBMAKERS_BINDKEY: "postgresql+psycopg://postgres:Kutas001@localhost:5432/users",
-    JOBTAKER_PASSWORDS_BINDKEY: "postgresql+psycopg://postgres:Kutas001@localhost:5432/passwords",
-    JOBMAKER_PASSWORDS_BINDKEY: "postgresql+psycopg://postgres:Kutas001@localhost:5432/passwords",
-    JOBS_BINDKEY: "postgresql+psycopg://postgres:Kutas001@localhost:5432/jobs",
-    LOGS_BINDKEY: "postgresql+psycopg://postgres:Kutas001@localhost:5432/logs"
+    JOBTAKERS_BINDKEY: f"{DB_PATH}users",
+    JOBMAKERS_BINDKEY: f"{DB_PATH}users",
+    JOBTAKER_PASSWORDS_BINDKEY: f"{DB_PATH}passwords",
+    JOBMAKER_PASSWORDS_BINDKEY: f"{DB_PATH}passwords",
+    JOBS_BINDKEY: f"{DB_PATH}jobs",
+    LOGS_BINDKEY: f"{DB_PATH}logs"
 }
 
 SQLALCHEMY_TRACK_MODIFICATIONS = False

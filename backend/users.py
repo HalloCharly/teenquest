@@ -79,21 +79,6 @@ def user_model_factory(bind_key, _roles):
             return f"""User{'\n'}{self.id}{'\n'}{self.first_name}{'\n'}{self.last_name}{'\n'}{self.email}{'\n'}{self.phone_number}{'\n'}{self.country}{'\n'}{self.city}{'\n'}
         {self.birth_date}{'\n'}{self.time_registered}{'\n'}{self.confirmation_email_id}{'\n'}tcon {self.time_confirmed}{'\n'}{self.rating_avg}{'\n'}{self.job_ammount_done}{'\n'}{self.gender}{'\n'}{self.pronouns}{'\n'}"""
         
-        def revoke_registration(self, db_session : Session | None = None, commit : bool = True) -> bool:
-            if self == global_objects.admin:
-                return False
-            db_was_empty = db_session == None
-            if db_was_empty:
-                db_session = get_user_session(self.__bind_key__ == global_objects.JOBTAKERS_BINDKEY)
-                db_session.begin()
-            
-            self.time_confirmed = None
-            
-            if db_was_empty or commit:
-                db_session.commit()
-                db_session.close()
-            return True
-        
         def confirm_registration(self, db_session : Session | None = None, commit : bool = True) -> bool:
             if self.time_confirmed != None:
                 return False
@@ -424,7 +409,8 @@ def send_confirmation_email(user_id : int, is_jobtaker : bool) -> bool | str:#ex
     (db_session, query) = get_user_by_id(user_id, is_jobtaker)
     user = query.first()
     user.confirmation_email_id = 0 if user.confirmation_email_id is None else user.confirmation_email_id + 1
-    if user.confirmation_email_id >= 5: #you wont need more than 5 conf emails
+    days_since_reg : timedelta = user.time_registered - datetime.today().astimezone()
+    if user.confirmation_email_id >= 5 * days_since_reg.days(): #allows only 5 conf email/day
         db_session.close()
         return False
     serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])

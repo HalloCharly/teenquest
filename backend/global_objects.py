@@ -41,6 +41,8 @@ USER_EDITING_REQ_FORM_KEYS : Tuple[str] = ('phone_num', 'country', 'birthdate', 
 
 EMAIL_CONFIRMATION_SALT : str = "confemailnigga"
 
+DB_PATH : str = "postgresql+psycopg://postgres:Kutas001@localhost:5432/"
+
 principals = Principal()
 admin_role = RoleNeed('admin')
 admin_permission = Permission(admin_role)
