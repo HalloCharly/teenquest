@@ -12,7 +12,8 @@ from users import (init_module as user_init_module,
                    delete_unconfirmed_users,
                    confirm_user_account,
                    send_confirmation_email as user_send_confirmation_email,
-                   get_user_by_id)
+                   get_user_by_id,
+                   logout as user_logout)
 from jobs import (init_module as job_init_module,
                   create_job,
                   get_job_by_id)
@@ -25,7 +26,7 @@ from global_objects import (db,
                             init_module as global_objects_init_module)
 from flask import Flask, flash, render_template, redirect, request, session, url_for
 from sqlalchemy.orm import sessionmaker
-from flask_login import current_user, login_required, logout_user
+from flask_login import current_user, login_required
 from apscheduler.schedulers.background import BackgroundScheduler as BGScheduler
 from flask_principal import identity_changed, AnonymousIdentity
 from flask_migrate import Migrate
@@ -62,7 +63,7 @@ job_init_module(app)
     
 #Scheduler
 scheduler = BGScheduler(daemon=True)
-scheduler.add_job(func= lambda : delete_unconfirmed_users(), trigger='interval', days=1)
+scheduler.add_job(func=delete_unconfirmed_users, trigger='interval', days=1)
 scheduler.start()
 register_atexit(scheduler.shutdown)
 
@@ -112,11 +113,7 @@ def login_page():
 @app.route('/logout', methods=["GET"])
 @login_required
 def logout():
-    logout_user()
-    for key in ('identity.name', 'identity.auth_type'):
-        session.pop(key, None)
-    identity_changed.send(app, identity=AnonymousIdentity())
-    session['account_type'] = global_objects.ANONYMOUS_SESSION_NAME
+    user_logout()
     return redirect(url_for("index_page"))
 
 @app.route('/delete', methods=["GET"])
@@ -130,11 +127,7 @@ def delete():
     user = search[1].first()
     user.delete_account(search[0])
     print(user.first_name)
-    logout_user()
-    for key in ('identity.name', 'identity.auth_type'):
-        session.pop(key, None)
-    identity_changed.send(app, identity=AnonymousIdentity())
-    session['account_type'] = global_objects.ANONYMOUS_SESSION_NAME
+    user_logout()
     return redirect(url_for("index_page"))
 
 @app.route('/resend', methods=["GET"])
@@ -161,13 +154,15 @@ def confirm_account(token):
 #JobTaker account management
 @app.route("/jobtaker/login", methods=["GET", "POST"])
 def login_jobtaker():
-    if(request.method == "POST"):
-        if(user_verify_login_attempt(request, True)):
+    if request.method == "POST":
+        if user_verify_login_attempt(request, True):
             return redirect(url_for('jobmarket_jobtaker_page'))
         else:
             flash("looser", "error")
             return render_template("login_jobtaker.html"), 404
     else:
+        if session['account_type'] == global_objects.JOBTAKER_SESSION_NAME:
+            return redirect(url_for("jobmarket_jobtaker_page"))
         return render_template("login_jobtaker.html")
 
 @app.route("/jobtaker/edit", methods=["GET", "POST"])

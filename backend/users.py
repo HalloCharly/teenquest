@@ -10,13 +10,13 @@ import phonenumbers
 from sqlalchemy import func, type_coerce
 from phonenumbers import NumberParseException, PhoneNumber, PhoneNumberFormat
 from email_validator import EmailNotValidError, EmailSyntaxError, validate_email 
-from flask_login import UserMixin, login_user, current_user
+from flask_login import UserMixin, login_user, current_user, logout_user
 from flask_mail import Mail, Message
 from sqlalchemy.orm import sessionmaker, Session, Query, scoped_session
 import global_objects
 from global_objects import db, login_manager, Gender
 from sqlalchemy_utils import EmailType, CountryType, PhoneNumberType, Country
-from flask_principal import identity_changed, UserNeed, Identity, identity_loaded
+from flask_principal import identity_changed, UserNeed, Identity, identity_loaded, AnonymousIdentity
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 #handles user validation, and user db operations(add, edit, delete)
@@ -24,9 +24,7 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 app : Flask
 
 sessionmaker_jobtaker : sessionmaker
-jobtaker_lock = Lock()
 sessionmaker_jobtaker : sessionmaker
-jobmaker_lock = Lock()
 
 def init_module(application):
     #initializes the users module
@@ -214,13 +212,6 @@ def get_user_session(is_jobtaker : bool) -> Session:
         return sessionmaker_jobtaker()
     else:
         return sessionmaker_jobmaker()
-    
-def get_session_lock(is_jobtaker : bool) -> Lock:
-    #returns a db session lock for jobtakers or jobmakers
-    if is_jobtaker:
-        return jobtaker_lock()
-    else:
-        return jobmaker_lock()
 
 def get_user_by_id(user_id : int, is_jobtaker : bool) -> Tuple[Session, Query[Any]] | None:
     #gets a user by id
@@ -347,7 +338,6 @@ def verify_login_attempt(request : Request, is_jobtaker : bool) -> bool:#request
     user_session.close()
     search = passwords.get_password_by_id(user.id, is_jobtaker)
     if(search == None):
-        password_session.close()
         return False
     (password_session, password) = (search[0], search[1].first())
     password_session.close()
@@ -405,22 +395,23 @@ def register_user_account(request : Request, is_jobtaker : bool, confirmation_em
     user_session.close()
     return result
 
-def send_confirmation_email(user_id : int, is_jobtaker : bool) -> bool | str:#expects user to exist in db
-    (db_session, query) = get_user_by_id(user_id, is_jobtaker)
+def send_confirmation_email(user_id : int, is_jobtaker : bool) -> bool | str:
+    search = get_user_by_id(user_id, is_jobtaker)
+    if(search == None):
+        return False
+    (db_session, query) = search
     user = query.first()
-    user.confirmation_email_id = 0 if user.confirmation_email_id is None else user.confirmation_email_id + 1
-    days_since_reg : timedelta = user.time_registered - datetime.today().astimezone()
-    if user.confirmation_email_id >= 5 * days_since_reg.days(): #allows only 5 conf email/day
+    user.confirmation_email_id = 0 if user.confirmation_email_id == None else user.confirmation_email_id + 1
+    days_since_reg : timedelta = datetime.today().astimezone() - user.time_registered.astimezone()
+    if user.confirmation_email_id >= 5 * (days_since_reg.days + 1): #allows only 5 conf email/day
         db_session.close()
         return False
     serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
     token = serializer.dumps({"id" : user.id, "is_jobtaker" : is_jobtaker, "confirmation_email_id" : user.confirmation_email_id}, salt=global_objects.EMAIL_CONFIRMATION_SALT)
-    
-    if global_objects.testing:
+    if not global_objects.SEND_EMAIL:
         db_session.commit()
         db_session.close()
         return url_for('confirm_account', token=token, _external = True)
-    
     mail = Mail(app)
     msg = Message(subject="Teenquest Email Confirmation", sender=app.config["MAIL_USERNAME"], recipients=[user.email])
     url = url_for('confirm_account', token=token, _external = True)
@@ -443,7 +434,6 @@ def confirm_user_account(token : str, expiration_time : int = 3600) -> Tuple[Any
         print(user_data)
         search = get_user_by_id(user_data["id"], user_data["is_jobtaker"])
         if search is None:
-            db_session.close()
             return 0
         (db_session, query) = search
         if query.first().confirmation_email_id != user_data["confirmation_email_id"]:
@@ -492,3 +482,10 @@ def on_identity_loaded(sender, identity):
             identity.provides.add(role)
     if global_objects.testing:
         print(identity.provides)
+        
+def logout():
+    logout_user()
+    for key in ('identity.name', 'identity.auth_type'):
+        session.pop(key, None)
+    identity_changed.send(app, identity=AnonymousIdentity())
+    session['account_type'] = global_objects.ANONYMOUS_SESSION_NAME

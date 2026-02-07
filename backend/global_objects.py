@@ -41,6 +41,8 @@ USER_EDITING_REQ_FORM_KEYS : Tuple[str] = ('phone_num', 'country', 'birthdate', 
 
 EMAIL_CONFIRMATION_SALT : str = "confemailnigga"
 
+SEND_EMAIL : bool = True
+
 DB_PATH : str = "postgresql+psycopg://postgres:Kutas001@localhost:5432/"
 
 principals = Principal()
@@ -95,5 +97,3 @@ def make_admin_password_object(admin_password_type):
     #creates the admin password object
     global admin_password
     admin_password = admin_password_type(0, admin_password_hash, "")
-
-
