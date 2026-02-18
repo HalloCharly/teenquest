@@ -5,22 +5,69 @@
         <link rel="stylesheet" href="/app/global.css">
     </head>
     <body>
+
         <h2>Create Account</h2>
-        <label for="name" class="in-group">Full Name:</label>
-        <input type="text" id="name" placeholder="Ex: John Doe" required class="in-global"/>
 
-
-        <label for="email" class="in-group">Email:</label>
-        <input type="email" id="email" placeholder="email@domain.com" required class="in-global"/>
-
-        <label for="password" class="in-group">Password:</label>
-        <input type="password" id="password" placeholder="password" required class="in-global"/>
-
-
-        <label for="confirm" class="in-group">Confirm Password:</label>
-        <input type="password" id="confirm" placeholder="confirm password" required class="in-global"/>
-
-        <button type="submit" class="global-button">Sign Up</button>
+        <div class="form-group">
+            <label for="first_name" class="singup-text">First Name</label>
+            <input type="text" name="first_name" id="first_name" maxlength="30" class="in-global" autocomplete="off"/>
         </div>
+
+        <div class="form-group">
+            <label for="last_name" class="singup-text">Last Name</label>
+            <input type="text" name="last_name" id="last_name" maxlength="30" class="in-global" autocomplete="off"/>
+        </div>
+
+        <div class="form-group">
+            <label for="email" class="singup-text">Email</label>
+            <input type="email" name="email" id="email" class="in-global" autocomplete="off"/>
+        </div>
+
+        <div class="form-group">
+            <label for="phone_num" class="singup-text">Phone Number</label>
+            <input type="tel" name="phone_num" id="phone_num" class="in-global" autocomplete="off"/>
+        </div>
+
+        <div class="form-group">
+            <label for="country" class="singup-text">Country (2 letters)</label>
+            <input type="text" name="country" id="country" maxlength="2" class="in-global" autocomplete="off"/>
+        </div>
+
+        <div class="form-group">
+            <label for="city" class="singup-text">City</label>
+            <input type="text" name="city" id="city" maxlength="200" class="in-global" autocomplete="off"/>
+        </div>
+
+        <div class="form-group">
+            <label for="birthdate" class="singup-text">Birthdate</label>
+            <input type="date" name="birthdate" id="birthdate" class="global-calendar" autocomplete="off"/>
+        </div>
+
+        <div class="form-group">
+            <label for="gender" class="singup-text">Gender</label>
+            <select name="gender" id="gender" class="global-dropdown" autocomplete="off">
+                <option value="0" selected>Male</option>
+                <option value="1">Female</option>
+                <option value="2">Non-binary</option>
+                <option value="3">Other</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="singup-text">Pronouns</label>
+            <div style="display:flex; gap:5px;">
+                <input type="text" name="pronouns_1" maxlength="5" pattern="[a-zA-Z0-9 ]*" class="in-global" autocomplete="off"/>
+                <span style="font-size: 45px; margin-top: -8px; margin-left: -5px; margin-right: -5px;">|</span>
+                <input type="text" name="pronouns_2" maxlength="5" pattern="[a-zA-Z0-9 ]*" class="in-global" autocomplete="off"/>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="password" class="singup-text">Password</label>
+            <input type="password" name="password" id="password" maxlength="30" class="in-global" autocomplete="off"/>
+        </div>
+
+        <input type="submit" value="Sign up" id="btn_add" class="global-button"/>
+
     </body>
 </html>
