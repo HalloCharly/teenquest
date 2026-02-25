@@ -25,13 +25,55 @@
 
         <div class="form-group">
             <label for="phone_num" class="singup-text">Phone Number</label>
-            <input type="tel" name="phone_num" id="phone_num" class="in-global" autocomplete="off"/>
+
+            <div class="phone-container">
+                <select name="phone_code" id="phone_code" autocomplete="off">
+                    <option value="">Loading...</option>
+                </select>
+
+                <input type="tel"
+                    name="phone_num"
+                    id="phone_num"
+                    placeholder="Enter phone number"
+                    autocomplete="off" />
+            </div>
         </div>
 
+
+        <script>
+            fetch("/app/extra_stuff/phone_codes.html")
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById("phone_code").innerHTML = data;
+            })
+            .catch(error => {
+                document.getElementById("phone_code").innerHTML =
+                    '<option value="">Failed to load codes</option>';
+            });
+        </script>
+
+
         <div class="form-group">
-            <label for="country" class="singup-text">Country (2 letters)</label>
-            <input type="text" name="country" id="country" maxlength="2" class="in-global" autocomplete="off"/>
+            <label for="country" class="singup-text">Country</label>
+
+            <select name="country" id="country" class="global-dropdown" autocomplete="off">
+                <option value="">Loading countries...</option>
+            </select>
         </div>
+
+        <script>
+            fetch("/app/extra_stuff/countries.html")
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById("country").innerHTML = data;
+            })
+            .catch(error => {
+                document.getElementById("country").innerHTML =
+                    '<option value="">Failed to load countries</option>';
+            });
+        </script>
+
+
 
         <div class="form-group">
             <label for="city" class="singup-text">City</label>
