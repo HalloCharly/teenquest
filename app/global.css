@@ -55,6 +55,8 @@ body {
   padding: 12px 15px;
   margin-top: 10px;
   transition: background-color 0.3s, cursor 0.3s, border 0.3s;
+  text-align: center;
+  text-decoration: none;
 }
 
 .global-button:hover {
@@ -234,4 +236,154 @@ body {
   color: #808080;
   font-size: 15px;
   opacity: 0.8;
+}
+
+/* settings  */
+
+.top-settings {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.top-settings .global-button {
+    width: 330px;
+    padding: 10px;
+    font-size: 16px;
+    margin-bottom: 10px;
+}
+
+.top-settings .form-group {
+    width: 330px;
+    text-align: left;
+    margin-bottom: 10px;
+}
+
+.account-section {
+    display: none;
+    margin-bottom: 20px;
+}
+
+.account-section .global-button {
+    width: 300px;
+    margin-bottom: 10px;
+}
+
+.display-mode {
+    margin-bottom: 20px;
+    text-align: center;
+    background-color: #000000;
+    color: #ffffff;
+    border: 2px solid #000000;
+    border-radius: 10px;
+    width: 296px;
+    padding: 5px 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 34px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .toggle-slider {
+    background-color: #2196F3;
+}
+
+input:checked + .toggle-slider:before {
+    transform: translateX(26px);
+}
+
+.logout-section {
+    margin-bottom: 20px;
+}
+
+.terms-link {
+    text-align: center;
+    margin-top: 50px;
+}
+
+.terms-link a {
+    color: #6c63ff;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.terms-link a:hover {
+    text-decoration: underline;
+}
+
+.dark-mode {
+    background-color: #121212;
+    color: #ffffff;
+}
+
+.dark-mode .global-button {
+    background-color: #333;
+    border-color: #333;
+    color: #fff;
+}
+
+.dark-mode .global-button:hover {
+    background-color: #555;
+    border-color: #555;
+}
+
+.dark-mode .in-global {
+    background-color: #333;
+    color: #fff;
+    border-color: #555;
+}
+
+.dark-mode .in-global::placeholder {
+    color: #ccc;
+}
+
+.dark-mode .social-btn {
+    background-color: #333;
+    color: #fff;
+    border-color: #555;
+}
+
+.dark-mode .social-btn:hover {
+    background-color: #555;
+}
+
+.dark-mode .display-mode {
+    background-color: #333;
+    border-color: #333;
 }

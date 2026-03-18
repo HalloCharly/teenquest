@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - TeenQuest</title>
+    <link rel="stylesheet" href="/app/global.css">
+</head>
+<body>
+    <h1 class="teenquest">TeenQuest</h1>
+    <img src="/app/assets/logo.png" alt="TeenQuest Logo" style="width:100px;height:100px;">
+    <h2>Settings</h2>
+    
+    <div class="top-settings">
+        <button class="global-button" onclick="toggleAccountSettings()">Account Settings</button>
+        <button class="global-button" onclick="openNotificationSettings()">Notification Settings</button>
+        <div class="form-group">
+            <label for="language" class="singup-text">Language</label>
+            <select name="language" id="language" class="global-dropdown" onchange="changeLanguage(this.value)">
+                <option value="">Loading...</option>
+            </select>
+        </div>
+    </div>
+    
+    <div id="account-section" class="account-section">
+        <button class="global-button" onclick="changePhone()">Change phone number</button>
+        <button class="global-button" onclick="changeEmail()">Change email</button>
+        <button class="global-button" onclick="changePassword()">Change password</button>
+        <button class="global-button" onclick="deleteAccount()">Delete account</button>
+    </div>
+    
+    <div class="display-mode">
+        <label>Display Mode: 
+            <label class="toggle-switch">
+                <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()">
+                <span class="toggle-slider"></span>
+            </label>
+        </label>
+    </div>
+    
+    <div class="logout-section">
+        <button class="global-button" onclick="logOut()">Log Out</button>
+    </div>
+    
+    <div class="terms-link">
+        <a href="/app/extra_stuff/terms-of-service">Terms of Service & Policies</a>
+    </div>
+    
+    <script>
+        function toggleAccountSettings() {
+            const section = document.getElementById('account-section');
+            section.style.display = section.style.display === 'block' ? 'none' : 'block';
+        }
+        
+        function openNotificationSettings() {
+            if ('Notification' in window) {
+                Notification.requestPermission().then(function(permission) {
+                    if (permission === 'granted') {
+                        alert('Notifications enabled');
+                    } else {
+                        alert('Notifications denied');
+                    }
+                });
+            } else {
+                alert('Notifications not supported in this browser');
+            }
+        }
+        
+        function changeLanguage(lang) {
+            localStorage.setItem('language', lang);
+        }
+        
+        function toggleDarkMode() {
+            const isDark = document.getElementById('darkModeToggle').checked;
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            applyTheme();
+        }
+        
+        function applyTheme() {
+            const theme = localStorage.getItem('theme') || 'light';
+            document.body.classList.toggle('dark-mode', theme === 'dark');
+            document.getElementById('darkModeToggle').checked = theme === 'dark';
+        }
+        
+        function changePhone() {
+            alert('Change phone number functionality not implemented');
+        }
+        
+        function changeEmail() {
+            alert('Change email functionality not implemented');
+        }
+        
+        function changePassword() {
+            alert('Change password functionality not implemented');
+        }
+        
+        function deleteAccount() {
+            if (confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+                alert('Account deletion not implemented');
+            }
+        }
+        
+        function logOut() {
+            if (confirm('Are you sure you want to log out?')) {
+                window.location.href = '/logout';
+            }
+        }
+        
+        window.onload = function() {
+            applyTheme();
+            fetch('/app/extra_stuff/languages.html')
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('language').innerHTML = data;
+                    const savedLang = localStorage.getItem('language') || 'en';
+                    document.getElementById('language').value = savedLang;
+                })
+                .catch(error => {
+                    document.getElementById('language').innerHTML = '<option value="">Failed to load languages</option>';
+                });
+        };
+    </script>
+</body>
+</html>
