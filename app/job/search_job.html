@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Search - TeenQuest</title>
+    <link rel="stylesheet" href="/app/global.css">
+</head>
+<body>
+    <main class="page-wrapper">
+        <section class="search-panel">
+            <h1>What quest are you looking for?</h1>
+            <div class="search-row">
+                <input type="search" id="searchInput" placeholder="Search jobs or tasks" aria-label="Search" autocomplete="off">
+            </div>
+            <div class="filter-row">
+                <button class="pill-btn" type="button" aria-label="Saved quests">Saved quests</button>
+                <button class="pill-btn" type="button" aria-label="Following">Following</button>
+                <button class="pill-btn" type="button" aria-label="Sort by">Sort by</button>
+            </div>
+        </section>
+
+        <section class="jobs-section" aria-label="Job listings">
+            <div id="jobsContainer" class="jobs-grid" aria-live="polite" aria-busy="false"></div>
+            <p id="emptyState" class="empty-state">No jobs loaded.</p>
+        </section>
+    </main>
+
+    <template id="jobCardTemplate">
+        <article class="job-card">
+            <div class="card-thumbnail">
+                <img src="" alt="Job image" loading="lazy">
+                <span class="price-tag"></span>
+            </div>
+            <div class="card-body">
+                <div class="card-heading">
+                    <h2></h2>
+                    <p class="job-distance"></p>
+                </div>
+                <p class="job-description"></p>
+                <div class="card-footer">
+                    <span class="rating"></span>
+                    <span class="seller-status"></span>
+                </div>
+            </div>
+        </article>
+    </template>
+
+    <script>
+        const jobsContainer = document.getElementById('jobsContainer');
+        const emptyState = document.getElementById('emptyState');
+        const template = document.getElementById('jobCardTemplate');
+
+        function renderJobs(jobs) {
+            jobsContainer.innerHTML = '';
+            if (!jobs || jobs.length === 0) {
+                emptyState.style.display = 'block';
+                return;
+            }
+            emptyState.style.display = 'none';
+            jobs.forEach(job => {
+                const node = template.content.cloneNode(true);
+                const card = node.querySelector('.job-card');
+                card.querySelector('img').src = job.image || 'https://via.placeholder.com/280x170';
+                card.querySelector('img').alt = job.title || 'Job image';
+                node.querySelector('.price-tag').textContent = job.price || '';
+                node.querySelector('h2').textContent = job.title || 'Untitled quest';
+                node.querySelector('.job-distance').textContent = job.distance || '';
+                node.querySelector('.job-description').textContent = job.description || '';
+                node.querySelector('.rating').textContent = job.rating ? `? ${job.rating}` : '';
+                node.querySelector('.seller-status').textContent = job.status || '';
+                jobsContainer.appendChild(node);
+            });
+        }
+
+        window.renderJobs = renderJobs;
+    </script>
+
+</body>
+</html>

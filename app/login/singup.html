@@ -2,11 +2,206 @@
 <html>
     <head>
         <title>Signup - TeenQuest</title>
-        <link rel="stylesheet" href="/app/global.css">
     </head>
+    <style>
+        html, body {
+            margin-top: 0;
+            min-height: 100%;
+            min-width: 100%;
+            padding: 0;
+            font-family:Arial, Helvetica, sans-serif
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            text-align: center;
+            width: 100vw;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #f0f4ff 0%, #edf8f1 52%, #e6f2ff 100%);
+            row-gap: 0;
+            padding-top: 50px;
+        }
+
+        .signup-wrapper {
+            background: #ffffff;
+            border-radius: 18px;
+            box-shadow: 0 16px 34px rgba(0,0,0,.14);
+            padding: 26px 20px 24px;
+            width: min(100%, 380px);
+            max-width: 380px;
+            text-align: left;
+            margin-bottom: 30px;
+        }
+
+        .teenquest{
+            color: #121212;
+            font-size: 28px;
+            margin: 0 0 20px;
+        }
+
+        .singup-text {
+            font-size: 14px;
+            color: #333;
+            text-align: left;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .form-group {
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 5px;
+        }
+        .form-group label {
+            margin-bottom: 5px;
+        }
+        .in-global,
+        .global-dropdown,
+        .global-calendar {
+            width: 300px;
+        }
+        .global-dropdown {
+            width: 335px;
+            padding: 10px 15px;
+            font-size: 16px;
+            border: 2px solid #808080;
+            border-radius: 10px;
+            background-color: #ffffff;
+            color: #000000;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        .in-global {
+            width: 300px;     
+            padding: 10px 15px;      
+            font-size: 20px;
+            border: 2px solid #808080;  
+            border-radius: 10px;      
+            outline: none;            
+            transition: border-color 0.3s, box-shadow 0.3s;
+            margin-bottom: 5px;
+            height: 20px;
+        }
+
+        .global-button {
+            width: 300px;
+            margin-bottom: 5px;
+            border-radius: 10px;
+            padding: 12px 18px;
+        }
+
+        .in-global::placeholder {
+            color: #808080;              
+            font-size: 15px;
+            opacity: 0.8;
+        }
+
+        .pronoun-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .pronoun-row input {
+            width: 145px;
+        }
+
+        .pronoun-separator {
+            font-size: 24px;
+            margin: 0;
+            line-height: 1;
+            color: #666;
+        }
+
+        .in-global:focus {
+            border-color: #6c63ff;   
+            box-shadow: 0 0 5px rgba(108, 99, 255, 0.5); 
+        }
+
+        .global-calendar {
+            color: #ffffff;
+            background-color: #808080;
+            border: 2px solid #000000;
+            border-radius: 10px;
+            width: 300px;
+            padding: 12px 15px;
+            transition: background-color 0.3s, cursor 0.3s;
+            margin-bottom: 5px;
+        }
+
+        .global-calendar:hover {
+            background-color: #222222;
+            cursor: pointer;
+        }
+
+        .phone-container {
+  width: 335px;
+  display: flex;
+  align-items: center;
+  padding: 10px 15px;
+  font-size: 20px;
+  border: 2px solid #808080;
+  border-radius: 10px;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  margin-bottom: 10px;
+  height: 42px;
+  box-sizing: border-box;
+}
+
+.phone-container:focus-within {
+  border-color: #555;
+  box-shadow: 0 0 5px rgba(0,0,0,0.2);
+}
+
+.phone-container select {
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  outline: none;
+  cursor: pointer;
+  margin-right: 10px;
+}
+
+.phone-container input {
+  border: none;
+  outline: none;
+  font-size: 20px;
+  flex: 1;
+  background: transparent;
+}
+
+.phone-container input::placeholder {
+  color: #808080;
+  font-size: 15px;
+  opacity: 0.8;
+}
+
+.global-button{
+  color: #ffffff;
+  background-color: #000000;
+  border: 2px solid #000000;
+  border-radius: 10px;
+  width: 330px;
+  padding: 12px 15px;
+  margin-top: 10px;
+  transition: background-color 0.3s, cursor 0.3s, border 0.3s;
+  text-align: center;
+  text-decoration: none;
+}
+
+.global-button:hover {
+  background-color: #222222;
+  border: 2px solid #222222;
+  cursor: pointer;
+}
+    </style>
     <body>
 
-        <h2>Create Account</h2>
+        <div class="signup-wrapper">
+            <h2 class="teenquest">Create Account</h2>
 
         <div class="form-group">
             <label for="first_name" class="singup-text">First Name</label>
@@ -97,9 +292,9 @@
 
         <div class="form-group">
             <label class="singup-text">Pronouns</label>
-            <div style="display:flex; gap:5px;">
+            <div class="pronoun-row">
                 <input type="text" name="pronouns_1" maxlength="5" pattern="[a-zA-Z0-9 ]*" class="in-global" autocomplete="off"/>
-                <span style="font-size: 45px; margin-top: -8px; margin-left: -5px; margin-right: -5px;">|</span>
+                <span class="pronoun-separator">|</span>
                 <input type="text" name="pronouns_2" maxlength="5" pattern="[a-zA-Z0-9 ]*" class="in-global" autocomplete="off"/>
             </div>
         </div>
@@ -110,6 +305,7 @@
         </div>
 
         <input type="submit" value="Sign up" id="btn_add" class="global-button"/>
+        </div>
 
     </body>
 </html>

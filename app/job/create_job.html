@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create New Quest - TeenQuest</title>
+<link rel="stylesheet" href="/app/global.css">
+
+</head>
+<body class="create-job-body">
+  <main class="create-quest-wrapper">
+    <section class="header-row">
+      <h1>Create New Quest</h1>
+    </section>
+
+    <section class="form-group">
+      <label for="categorySelect">Select Category</label>
+      <select id="categorySelect" aria-label="Select category">
+        <option value="">Choose category</option>
+        <option value="dog-walking">Dog Walking</option>
+        <option value="babysitting">Babysitting</option>
+        <option value="animal-sitting">Animal Sitting</option>
+        <option value="car-wash">Car Wash</option>
+        <option value="lawn-mowing">Lawn Mowing</option>
+        <option value="general-cleaning">General Cleaning</option>
+      </select>
+    </section>
+
+    <form id="questForm" class="hidden" novalidate autocomplete="off">
+      <section class="form-group">
+        <label for="questTitle">Quest Title</label>
+        <input type="text" id="questTitle" name="questTitle" placeholder="Enter Quest Title..." autocomplete="off" required>
+      </section>
+
+      <section class="form-group">
+        <label for="amount">Amount of Money (EUR)</label>
+        <input type="text" id="amount" name="amount" placeholder="Enter amount" inputmode="decimal" autocomplete="off" required>
+        <input type="hidden" id="amountRaw" name="amountRaw" autocomplete="off">
+      </section>
+
+      <section class="form-group">
+        <label for="additionalInfo">Additional Information</label>
+        <textarea id="additionalInfo" name="additionalInfo" rows="4" placeholder="Enter additional information..."></textarea>
+      </section>
+
+      <section class="time-section">
+        <div class="time-block">
+          <label>From:</label>
+          <div class="date-time-row">
+            <input type="date" id="fromDate" name="fromDate" required autocomplete="off">
+            <input type="time" id="fromTime" name="fromTime" required autocomplete="off">
+          </div>
+        </div>
+
+        <div class="time-block">
+          <label>To:</label>
+          <div class="date-time-row">
+            <input type="date" id="toDate" name="toDate" required autocomplete="off">
+            <input type="time" id="toTime" name="toTime" required autocomplete="off">
+          </div>
+        </div>
+      </section>
+
+      <section class="form-group">
+        <label for="location">Location</label>
+        <input type="text" id="location" name="location" placeholder="Enter location" autocomplete="off" required>
+      </section>
+
+      <section class="form-group">
+        <label for="picture">Picture (optional)</label>
+        <input type="file" id="picture" name="picture" accept="image/*" autocomplete="off">
+      </section>
+
+      <section id="nameGroup" class="form-group hidden">
+        <label for="nameInput">Enter Name</label>
+        <input type="text" id="nameInput" name="nameInput" placeholder="Name of animal or child" autocomplete="off" required>
+      </section>
+
+      <button type="submit" id="putUpOffer" class="global-button">Put Up Offer</button>
+    </form>
+  </main>
+
+  <script>
+    const categorySelect = document.getElementById('categorySelect');
+    const questForm = document.getElementById('questForm');
+    const nameGroup = document.getElementById('nameGroup');
+    const nameInput = document.getElementById('nameInput');
+    const amountInput = document.getElementById('amount');
+    const amountRaw = document.getElementById('amountRaw');
+
+    const categoriesWithName = ['dog-walking', 'babysitting', 'animal-sitting'];
+
+    categorySelect.addEventListener('change', () => {
+      const value = categorySelect.value;
+      if (!value) {
+        questForm.classList.add('hidden');
+        nameGroup.classList.add('hidden');
+        nameInput.removeAttribute('required');
+        return;
+      }
+
+      questForm.classList.remove('hidden');
+      if (categoriesWithName.includes(value)) {
+        nameGroup.classList.remove('hidden');
+        nameInput.setAttribute('required', '');
+      } else {
+        nameGroup.classList.add('hidden');
+        nameInput.removeAttribute('required');
+      }
+    });
+
+    amountInput.addEventListener('input', (e) => {
+      let raw = e.target.value.replace(/[€\s]/g, '');
+      raw = raw.replace(',', '.');
+      raw = raw.replace(/[^0-9.]/g, '');
+      if (!raw) {
+        amountRaw.value = '';
+        e.target.value = '';
+        return;
+      }
+      let parsed = parseFloat(raw);
+      if (Number.isNaN(parsed)) {
+        amountRaw.value = '';
+        e.target.value = '';
+        return;
+      }
+      if (parsed > 1000) {
+        parsed = 1000;
+      }
+      amountRaw.value = parsed.toFixed(2);
+      e.target.value = `${parsed.toFixed(2)}€`;
+    });
+
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('fromDate').value = today;
+    document.getElementById('toDate').value = today;
+
+    questForm.addEventListener('submit', (event) => {
+      if (nameGroup.classList.contains('hidden')) {
+        nameInput.removeAttribute('required');
+      } else {
+        nameInput.setAttribute('required', '');
+      }
+
+      if (!questForm.checkValidity()) {
+        event.preventDefault();
+        questForm.reportValidity();
+        return;
+      }
+
+      event.preventDefault();
+      const jobData = {
+        category: categorySelect.value,
+        title: document.getElementById('questTitle').value,
+        amount: amountRaw.value,
+        additionalInfo: document.getElementById('additionalInfo').value,
+        fromDate: document.getElementById('fromDate').value,
+        fromTime: document.getElementById('fromTime').value,
+        toDate: document.getElementById('toDate').value,
+        toTime: document.getElementById('toTime').value,
+        location: document.getElementById('location').value,
+        name: nameInput.value,
+      };
+      console.log('Quest offer ready:', jobData);
+      alert('Quest offer prepared (mock).');
+    });
+  </script>
+
+</body>
+</html>

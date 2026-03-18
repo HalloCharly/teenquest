@@ -2,24 +2,155 @@
 <html>
     <head>
         <title>Login - TeenQuest</title>
-        <link rel="stylesheet" href="/app/global.css">
     </head>
+    <style>
+        html, body {
+            margin-top: 0;
+            min-height: 100%;
+            min-width: 100%;
+            padding: 0;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            text-align: center;
+            width: 100vw;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #f0f4ff 0%, #edf8f1 52%, #e6f2ff 100%);
+            row-gap: 0;
+            padding-top: 50px;
+        }
+
+        .login-panel {
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 16px 34px rgba(0, 0, 0, 0.14);
+            width: min(100%, 380px);
+            max-width: 380px;
+            padding: 28px 24px;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .teenquest {
+            color: #121212;
+            font-size: 28px;
+            margin: 0 0 12px;
+        }
+
+        .in-global {
+            width: 300px;
+            padding: 10px 15px;
+            font-size: 20px;
+            border: 2px solid #808080;
+            border-radius: 10px;
+            outline: none;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            margin-bottom: 5px;
+            height: 42px;
+            box-sizing: border-box;
+        }
+
+        .in-global::placeholder {
+            color: #808080;
+            font-size: 15px;
+            opacity: 0.8;
+        }
+
+        .in-global:focus {
+            border-color: #6c63ff;
+            box-shadow: 0 0 5px rgba(108, 99, 255, 0.5);
+        }
+
+        .global-button {
+            color: #ffffff;
+            background-color: #000000;
+            border: 2px solid #000000;
+            border-radius: 10px;
+            width: 300px;
+            height: 42px;
+            box-sizing: border-box;
+            padding: 10px 15px;
+            margin: 10px 0;
+            transition: background-color 0.3s, cursor 0.3s, border 0.3s;
+            text-align: center;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .global-button:hover {
+            background-color: #222222;
+            border: 2px solid #222222;
+        }
+
+        .divider {
+            display: block;
+            margin: 10px auto;
+            color: #808080;
+        }
+
+        .social-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 300px;
+            padding: 12px 15px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s, border 0.3s;
+            margin-bottom: 8px;
+            height: 42px;
+        }
+
+        .social-btn.google {
+            background-color: #ffffff;
+            color: #000000;
+            border: 1px solid #808080;
+        }
+
+        .social-btn.google:hover {
+            background-color: #808080;
+            border: 1px solid #000000;
+        }
+
+        .social-btn.apple {
+            background-color: #ffffff;
+            color: #000000;
+            border: 1px solid #808080;
+        }
+
+        .social-btn.apple:hover {
+            background-color: #808080;
+            border: 1px solid #000000;
+        }
+    </style>
     <body>
-        <h1 class="teenquest">TeenQuest</h1>
-        <img src="/app/assets/logo.png" alt="TeenQuest Logo" style="width:100px;height:100px;">
-        <h2>Welcome back!</h2>
-        <p>Login to your account</p>
-        <input type="email" placeholder="email@domain.com" autocomplete="off" class="in-global">
-        <input type="password" placeholder="password" autocomplete="off" class="in-global">
-        <button class="global-button" onclick="window.location.href='dashboard/dashboard.html'">Continue</button>
-        <span class="divider">--------------------------------------or--------------------------------------</span>
-        <button class="social-btn google">
-          <img src="/app/assets/google-logo.png" alt="Google logo">
-          Continue with Google
-        </button>
-        <button class="social-btn apple">
-          <img src="/app/assets/apple-logo.png" alt="Apple logo">
-          Continue with Apple
-        </button>
+        <div class="login-panel">
+            <h1 class="teenquest">TeenQuest</h1>
+            <img src="/app/assets/logo.png" alt="TeenQuest Logo" style="width:100px;height:100px;margin-bottom:12px;">
+            <h2>Welcome back!</h2>
+            <p>Login to your account</p>
+            <input type="email" placeholder="email@domain.com" autocomplete="off" class="in-global">
+            <input type="password" placeholder="password" autocomplete="off" class="in-global">
+            <button class="global-button" onclick="window.location.href='dashboard/dashboard.html'">Continue</button>
+            <span class="divider">-------------------------------or-------------------------------</span>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+              <button class="social-btn google">
+              <img src="/app/assets/google-logo.png" alt="Google logo" style="width:20px;height:20px;">
+              Continue with Google
+            </button>
+            <button class="social-btn apple">
+              <img src="/app/assets/apple-logo.png" alt="Apple logo" style="width:20px;height:20px;">
+              Continue with Apple
+            </button>
+            </div>
     </body>
 </html>

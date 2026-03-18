@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edit Quest - TeenQuest</title>
+  <link rel="stylesheet" href="/app/global.css">
+</head>
+<body class="create-job-body">
+  <main class="create-quest-wrapper">
+    <section class="header-row">
+      <h1>Edit Quest</h1>
+    </section>
+
+    <section class="filter-row">
+      <h2>Select quest to edit...</h2>
+      <div id="questListContainer" class="jobs-grid" aria-live="polite" aria-busy="false"></div>
+      <p id="noQuestsState" class="empty-state">No quests found.</p>
+    </section>
+
+    <section class="form-group" id="categoryDisplay" style="display:none;">
+      <label>Category</label>
+      <div id="categoryText" style="font-weight:700;color:#333;"></div>
+    </section>
+
+    <form id="questForm" class="hidden" novalidate autocomplete="off">
+      <section class="form-group">
+        <label for="questTitle">Quest Title</label>
+        <input type="text" id="questTitle" name="questTitle" placeholder="Enter Quest Title..." autocomplete="off" required>
+      </section>
+
+      <section class="form-group">
+        <label for="amount">Amount of Money (EUR)</label>
+        <input type="text" id="amount" name="amount" placeholder="Enter amount" inputmode="decimal" autocomplete="off" required>
+        <input type="hidden" id="amountRaw" name="amountRaw" autocomplete="off">
+      </section>
+
+      <section class="time-section">
+        <div class="time-block">
+          <label>From:</label>
+          <div class="date-time-row">
+            <input type="date" id="fromDate" name="fromDate" required autocomplete="off">
+            <input type="time" id="fromTime" name="fromTime" required autocomplete="off">
+          </div>
+        </div>
+
+        <div class="time-block">
+          <label>To:</label>
+          <div class="date-time-row">
+            <input type="date" id="toDate" name="toDate" required autocomplete="off">
+            <input type="time" id="toTime" name="toTime" required autocomplete="off">
+          </div>
+        </div>
+      </section>
+
+      <section class="form-group">
+        <label for="location">Location</label>
+        <input type="text" id="location" name="location" placeholder="Enter location" autocomplete="off" required>
+      </section>
+
+      <section id="nameGroup" class="form-group hidden">
+        <label for="nameInput">Enter Name</label>
+        <input type="text" id="nameInput" name="nameInput" placeholder="Name of animal or child" autocomplete="off" required>
+      </section>
+
+      <section class="form-group">
+        <label for="picture">Picture (optional)</label>
+        <input type="file" id="picture" name="picture" accept="image/*" autocomplete="off">
+      </section>
+
+      <section class="form-group">
+        <label for="additionalInfo">Additional Information</label>
+        <textarea id="additionalInfo" name="additionalInfo" rows="4" placeholder="Enter additional information..."></textarea>
+      </section>
+
+      <button type="submit" id="saveChanges" class="global-button">Save Changes</button>
+      <button type="button" id="deleteQuest" class="global-button" style="background:#ff2e2e;border-color:#ff2e2e;margin-top:8px;">Delete Quest</button>
+    </form>
+  </main>
+
+  <div id="confirmModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalDesc">
+    <div class="modal-content">
+      <h2 id="modalTitle">Confirm the deletion of the quest?</h2>
+      <p id="modalDesc">When you click confirm, it will delete your quest, else it won't.</p>
+      <div class="modal-actions">
+        <button type="button" id="confirmDelete" class="global-button" style="background:#ff2e2e;border-color:#ff2e2e;">Accept</button>
+        <button type="button" id="cancelDelete" class="global-button" style="background:#ccc;border-color:#ccc;color:#000;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const questListContainer = document.getElementById('questListContainer');
+    const noQuestsState = document.getElementById('noQuestsState');
+    const categoryDisplay = document.getElementById('categoryDisplay');
+    const categoryText = document.getElementById('categoryText');
+    const questForm = document.getElementById('questForm');
+    const nameGroup = document.getElementById('nameGroup');
+    const nameInput = document.getElementById('nameInput');
+    const amountInput = document.getElementById('amount');
+    const amountRaw = document.getElementById('amountRaw');
+
+    const quests = [];
+
+    function renderQuestList() {
+      questListContainer.innerHTML = '';
+      if (!quests || quests.length === 0) {
+        noQuestsState.style.display = 'block';
+        return;
+      }
+      noQuestsState.style.display = 'none';
+
+      quests.forEach((quest) => {
+        const card = document.createElement('article');
+        card.className = 'job-card';
+        card.innerHTML = `
+          <strong>${quest.title}</strong>
+          <p>${quest.category.replace('-', ' ')}</p>
+          <p>${quest.amount}€</p>
+        `;
+        card.addEventListener('click', () => {
+          setFormData(quest);
+          categoryDisplay.style.display = 'block';
+        });
+        questListContainer.appendChild(card);
+      });
+    }
+
+    const categoriesWithName = ['dog-walking', 'babysitting', 'animal-sitting'];
+
+    function renderFormForCategory(category) {
+      if (!category) {
+        questForm.classList.add('hidden');
+        nameGroup.classList.add('hidden');
+        nameInput.removeAttribute('required');
+        return;
+      }
+      questForm.classList.remove('hidden');
+      if (categoriesWithName.includes(category)) {
+        nameGroup.classList.remove('hidden');
+        nameInput.setAttribute('required', '');
+      } else {
+        nameGroup.classList.add('hidden');
+        nameInput.removeAttribute('required');
+      }
+    }
+
+    function setFormData(data) {
+      categoryText.textContent = data.category.replace('-', ' ');
+      renderFormForCategory(data.category);
+      document.getElementById('questTitle').value = data.title;
+      amountRaw.value = parseFloat(data.amount).toFixed(2);
+      amountInput.value = `${parseFloat(data.amount).toFixed(2)}€`;
+      document.getElementById('fromDate').value = data.fromDate;
+      document.getElementById('fromTime').value = data.fromTime;
+      document.getElementById('toDate').value = data.toDate;
+      document.getElementById('toTime').value = data.toTime;
+      document.getElementById('location').value = data.location;
+      nameInput.value = data.name || '';
+      document.getElementById('additionalInfo').value = data.additionalInfo;
+    }
+
+    amountInput.addEventListener('input', (e) => {
+      let raw = e.target.value.replace(/[€\s]/g, '');
+      raw = raw.replace(',', '.');
+      raw = raw.replace(/[^0-9.]/g, '');
+      if (!raw) {
+        amountRaw.value = '';
+        e.target.value = '';
+        return;
+      }
+      let parsed = parseFloat(raw);
+      if (Number.isNaN(parsed)) {
+        amountRaw.value = '';
+        e.target.value = '';
+        return;
+      }
+      if (parsed > 1000) parsed = 1000;
+      amountRaw.value = parsed.toFixed(2);
+      e.target.value = `${parsed.toFixed(2)}€`;
+    });
+
+    document.getElementById('saveChanges').addEventListener('click', (e) => {
+      if (!questForm.checkValidity()) {
+        questForm.reportValidity();
+        return;
+      }
+      const updated = {
+        category: categoryText.textContent,
+        title: document.getElementById('questTitle').value,
+        amount: amountRaw.value,
+        fromDate: document.getElementById('fromDate').value,
+        fromTime: document.getElementById('fromTime').value,
+        toDate: document.getElementById('toDate').value,
+        toTime: document.getElementById('toTime').value,
+        location: document.getElementById('location').value,
+        name: nameInput.value,
+        additionalInfo: document.getElementById('additionalInfo').value,
+      };
+      console.log('Saved quest data:', updated);
+      alert('Quest updated (mock).');
+    });
+
+    const confirmModal = document.getElementById('confirmModal');
+    const deleteQuestBtn = document.getElementById('deleteQuest');
+    const cancelDeleteBtn = document.getElementById('cancelDelete');
+    const confirmDeleteBtn = document.getElementById('confirmDelete');
+
+    deleteQuestBtn.addEventListener('click', () => {
+      confirmModal.classList.remove('hidden');
+    });
+
+    cancelDeleteBtn.addEventListener('click', () => {
+      confirmModal.classList.add('hidden');
+    });
+
+    confirmDeleteBtn.addEventListener('click', () => {
+      confirmModal.classList.add('hidden');
+      console.log('Quest deleted.');
+      alert('Quest deleted (mock).');
+      questForm.reset();
+      questForm.classList.add('hidden');
+      nameGroup.classList.add('hidden');
+      categoryText.textContent = '';
+      categoryDisplay.style.display = 'none';
+    });
+
+    window.addEventListener('load', () => {
+      renderQuestList();
+    });
+  </script>
+</body>
+</html>
