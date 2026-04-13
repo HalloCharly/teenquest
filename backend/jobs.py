@@ -11,14 +11,13 @@ from sqlalchemy_utils import CountryType, Country
 from decimal import Decimal
 from users import get_user_by_id 
 
-#handles password checking, hashing, and password db operations(add, edit, delete)
+#handles job creation, deletion, editing
 
 app : Flask
 
 sessionmaker_job : sessionmaker
 
-def init_module(application):
-    #initializes the jobs module
+def init_module(application): #initializes the jobs module
     with application.app_context():
         global app
         app = application
@@ -64,13 +63,12 @@ class Job(db.Model):
         self.job_description = job_description
         self.job_salary = job_salary
     
-    def __repr__(self) -> str:
+    def __repr__(self) -> str: #string representation of a job
         return f"""Job{'\n'}{self.id}{'\n'}{self.jobtaker_id}{'\n'}{self.jobmaker_id}{'\n'}{self.job_state}{'\n'}{self.date_time_created}{'\n'}{self.date_time_accepted_taker}{'\n'}
         {self.date_time_accepted_maker}{'\n'}{self.date_time_started}{'\n'}{self.date_time_ended}{'\n'}{self.date_time_payed}{'\n'}{self.job_type}{'\n'}{self.date_time_scheduled_start}{'\n'}
         {self.date_time_scheduled_end}{'\n'}{self.country}, {self.city}, {self.street}, {self.zip_code}{'\n'}{self.job_title}{'\n'}{self.job_description}{'\n'}, {self.job_salary}{'\n'}"""
 
-    def edit_job(self, request : Request, db_session : Session | None = None, commit : bool = True) -> bool:
-        #validates and changes user accessible job data from a user request if job isn't locked
+    def edit_job(self, request : Request, db_session : Session | None = None, commit : bool = True) -> bool: #validates and changes user accessible job data from a user request if job isn't locked
         if not validate_job_request(request):
             return False
         db_was_empty = db_session == None
@@ -92,21 +90,11 @@ class Job(db.Model):
             Job.job_salary : Decimal(request.form['job_salary'])
         })
         db_session.flush()
-        #self.job_type = request.form['job_type']
-        #self.date_time_scheduled_start = datetime.strptime(request.form['job_scheduled_start'], "%Y-%m-%dT%H:%M")
-        #self.date_time_scheduled_end = datetime.strptime(request.form['job_scheduled_end'], "%Y-%m-%dT%H:%M")
-        #self.country = Country(request.form['country'])
-        #self.city = request.form['city']
-        #self.zip_code = request.form['zip_code']
-        #self.street = request.form['street']
-        #self.job_title = request.form['job_title']
-        #self.job_description = request.form['job_description']
-        #self.job_salary = Decimal(request.form['job_salary'])
         if db_was_empty or commit:
             db_session.commit()
         return True
     
-    def deny_jobtaker_job_state(self : Session | None = None, commit : bool = True):
+    def deny_jobtaker_job_state(self : Session | None = None, commit : bool = True): #for a jobmaker rejecting a jobtaker
         if self.job_state != global_objects.JobState.ACCEPTED_TAKER:
             return False
         db_was_empty = db_session == None
@@ -119,8 +107,7 @@ class Job(db.Model):
         if db_was_empty or commit:
             db_session.commit()
         
-    def progress_job_state(self, job_state : JobState, rating : int | None = None, jobtaker_id : int | None = None, db_session : Session | None = None, commit : bool = True) -> bool:
-        #"progresses" job forward (reffer to chart)
+    def progress_job_state(self, job_state : JobState, rating : int | None = None, jobtaker_id : int | None = None, db_session : Session | None = None, commit : bool = True) -> bool: #"progresses" job forward (reffer to chart)
         db_was_empty = db_session == None
         if db_was_empty:
             db_session : Session = sessionmaker_job()
@@ -174,8 +161,7 @@ class Job(db.Model):
             db_session.commit()
         return True
 
-    def delete_job(self, db_session : Session | None = None, commit : bool = True) -> bool:
-        #deletes job if it isn't locked
+    def delete_job(self, db_session : Session | None = None, commit : bool = True) -> bool: #deletes job if it isn't locked
         if self.job_state.value >= JobState.ACCEPTED_MAKER.value:#if job_state is alr accepted, block job editing
             return False
         db_was_empty = db_session == None
@@ -187,8 +173,7 @@ class Job(db.Model):
             db_session.commit()
         return True
 
-def get_all_jobtaker_jobs(user) -> Tuple[Session, Query[Job]] | None:
-    #returns a session and query with all of a jobtaker's jobs
+def get_all_jobtaker_jobs(user) -> Tuple[Session, Query[Job]] | None: #returns a session and query with all of a jobtaker's jobs
     if not isinstance(user, global_objects.jobtaker_type):
         return None
     db_session : Session = sessionmaker_job()
@@ -199,8 +184,7 @@ def get_all_jobtaker_jobs(user) -> Tuple[Session, Query[Job]] | None:
     else:
         return (db_session, query)
     
-def get_all_jobmaker_jobs(user) -> Tuple[Session, Query[Job]] | None:
-    #returns a session and query with all of a jobmaker's jobs
+def get_all_jobmaker_jobs(user) -> Tuple[Session, Query[Job]] | None: #returns a session and query with all of a jobmaker's jobs
     if not isinstance(user, global_objects.jobmaker_type):
         return None
     db_session : Session = sessionmaker_job()
@@ -211,8 +195,7 @@ def get_all_jobmaker_jobs(user) -> Tuple[Session, Query[Job]] | None:
     else:
         return (db_session, query)
 
-def get_job_by_id(job_id : int) -> Tuple[Session, Query[Job]] | None:
-    #gets job from db by id
+def get_job_by_id(job_id : int) -> Tuple[Session, Query[Job]] | None: #gets job from db by id
     db_session : Session = sessionmaker_job()
     db_session.begin()
     query = db_session.query(Job).filter(Job.id == int(job_id))
@@ -220,8 +203,7 @@ def get_job_by_id(job_id : int) -> Tuple[Session, Query[Job]] | None:
         return None
     return (db_session, query)
 
-def create_job(user, request : Request) -> bool:
-    #validates and creates a job from a user request
+def create_job(user, request : Request) -> bool: #validates and creates a job from a user request
     if not validate_job_request(request):
         return False
     search = get_user_by_id(user.id, False)
@@ -238,8 +220,7 @@ def create_job(user, request : Request) -> bool:
     db_session.commit()
     return True
 
-def update_jobs_ratings(user) -> bool:
-    #gets all jobs belonging to a user and updates their ratings to the user's rating
+def update_jobs_ratings(user) -> bool: #gets all jobs belonging to a user and updates their ratings to the user's rating
     jobs = get_all_jobmaker_jobs(user)
     if jobs == None:
         return False
@@ -249,8 +230,7 @@ def update_jobs_ratings(user) -> bool:
     db_session.commit()
     return True
 
-def validate_job_request(request : Request) -> bool:
-    #checks if request.form contains parsable information
+def validate_job_request(request : Request) -> bool: #checks if request.form contains parsable information
     def handle_error(e):
         print(e)
         return False
@@ -277,7 +257,7 @@ def validate_job_request(request : Request) -> bool:
         return handle_error(e)
     return True
 
-def get_filtered_jobs(user, request : Request, row_count : int = 20) -> Query[Job] | None:
+def get_filtered_jobs(user, request : Request, row_count : int = 20) -> Query[Job] | None: #filters for jobs
     db_session : Session = sessionmaker_job()
     db_session.begin()
     try:
@@ -290,7 +270,7 @@ def get_filtered_jobs(user, request : Request, row_count : int = 20) -> Query[Jo
         case JobFilter.DEFAULT | _:
             query.filter(Job.country == user.country)
             query.order_by(desc(Job.jobmaker_rating))
-            #filter by city prox here plzzz
+            #todo: implement filtering/sorting by geographical proximity
             query.limit(row_count)
     return query
             

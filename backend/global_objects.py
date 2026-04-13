@@ -18,8 +18,9 @@ testing = False #The backend testing var, turn off for prod & frontend tests
 admin = None
 admin_password = None
 
-admin_password_hash = "c31083adbb87e2490499a657d7f790dbfa7571f5f639b64c1e6ce44d7f06c4d2"
+admin_password_hash = "" #gets loaded from .env
 
+#constants for accessing/creating dbs
 JOBTAKERS_BINDKEY : str = "jobtakers"
 JOBMAKERS_BINDKEY : str = "jobmakers"
 
@@ -31,15 +32,17 @@ LOGS_BINDKEY : str = "logs"
 
 DB_BINDKEYS_TO_CREATE : Tuple[str] = (JOBTAKERS_BINDKEY, JOBMAKERS_BINDKEY, JOBTAKER_PASSWORDS_BINDKEY, JOBMAKER_PASSWORDS_BINDKEY, JOBS_BINDKEY, LOGS_BINDKEY)
 
+#constants for identifying sessions
 ANONYMOUS_SESSION_NAME : str = ""
 JOBTAKER_SESSION_NAME : str = "jobtaker"
 JOBMAKER_SESSION_NAME : str = "jobmaker"
 ADMIN_SESSION_NAME : str = "admin"
 
+
 USER_CREATION_REQ_FORM_KEYS : Tuple[str] = ('email', 'phone_num', 'country', 'birthdate', 'gender')
 USER_EDITING_REQ_FORM_KEYS : Tuple[str] = ('phone_num', 'country', 'birthdate', 'gender')
 
-EMAIL_CONFIRMATION_SALT : str = "confemailnigga"
+email_confirmation_salt : str = "" #gets loaded from .env
 
 principals = Principal()
 admin_role = RoleNeed('admin')
@@ -56,8 +59,7 @@ jobmaker_password_type : type
 job_type : type
 log_type : type
 
-def init_module(application):
-    #sets up the Principals (user session access privileges)
+def init_module(application):#sets up flask Principals (role based acces control)
     global app
     app = application
     principals.init_app(application)
@@ -79,19 +81,15 @@ class JobState(Enum):
 class JobFilter(Enum):
     DEFAULT = 0
     
-def make_admin_object(admin_type):
-    #creates the admin object
+def make_admin_object(admin_type):#creates and initializes the admin object
     global admin
-    admin = admin_type("admin", "", "", '', Country('BE'), "", datetime.min, Gender.MALE, "que/quem")
+    admin = admin_type("admin", "", "", '', Country('BE'), "", datetime.min, Gender.MALE, "x/y")
     admin.id = 0
     admin.date_time_created = datetime.min
     admin.rating = 0
     admin.job_ammount_started = 0
     admin.job_ammount_finished = 0
 
-def make_admin_password_object(admin_password_type):
-    #creates the admin password object
+def make_admin_password_object(admin_password_type): #creates and initializes the admin password object
     global admin_password
     admin_password = admin_password_type(0, admin_password_hash, "")
-
-

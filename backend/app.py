@@ -29,13 +29,24 @@ from flask_login import current_user, login_required, logout_user
 from apscheduler.schedulers.background import BackgroundScheduler as BGScheduler
 from flask_principal import identity_changed, AnonymousIdentity
 from flask_migrate import Migrate
+from os import environ
+from flask_config import load_env_config
 
 #main app file
 
 #App
 app = Flask(__name__)
 
+#attempts to load app config (if envvars are missing, then it crashes)
+try:
+    load_env_config(app)
+    global_objects.admin_password_hash = environ['ADMIN_PASSWORD_HASH']
+    global_objects.email_confirmation_salt = environ['EMAIL_CONFIRMATION_SALT']
+except Exception as e:
+    print(e)
+    sys.exit()
 app.config.from_pyfile('./flask_config.py')
+
 global_objects.testing = sys.argv[1] == "Test" if 1 < len(sys.argv) else False
 if global_objects.testing : #you can now decide what templates the app uses based on if y run it /w Test as the first arg
     app.template_folder = '../test_html'
@@ -44,7 +55,7 @@ else:
 
 @app.before_request
 def session_permanence_handler():
-    #Makes the session impermanet if an admin acc is logged in
+    #Makes the session impermanet if an admin acc is logged in (doesnt remember login if is admin for sec reasons)
     session.permanent = session.get('account_type') != global_objects.ADMIN_SESSION_NAME
 
 login_manager.init_app(app)
@@ -60,13 +71,13 @@ user_init_module(app)
 password_init_module(app)
 job_init_module(app)
     
-#Scheduler
+#Scheduler for unconfirmed user deletion
 scheduler = BGScheduler(daemon=True)
 scheduler.add_job(func= lambda : delete_unconfirmed_users(), trigger='interval', seconds=10)
 scheduler.start()
 register_atexit(scheduler.shutdown)
 
-class Log(db.Model):
+class Log(db.Model): #placeholder log db entry class
     __bind_key__ = global_objects.LOGS_BINDKEY
     id = db.Column(db.Integer(), primary_key=True)
     sender_id = db.Column(db.Integer(), nullable=False) #we set the ids to positive if its a jbmaker, and negative if its a jbtaker
@@ -83,7 +94,7 @@ class Log(db.Model):
     def __repr__(self) -> str:
         return f"Log{'\n'}{self.id}{'\n'}{self.sender_id}{'\n'}{self.recipient_id}{'\n'}{self.date_time_sent}{'\n'}{self.content}{'\n'}"
 
-def test_log(force):#adds 1 placeholder log || ts is temporary, jus using this for now
+def test_log(force):#adds 1 placeholder log || is temporary, jus using this for now
     db_session = sessionmaker(bind=db.engines[global_objects.LOGS_BINDKEY])()
     db_session.begin()
     if db_session.query(Log).filter(Log.sender_id == 1).count() == 0 or force:
@@ -92,7 +103,6 @@ def test_log(force):#adds 1 placeholder log || ts is temporary, jus using this f
     
 with app.app_context():
     db.create_all(bind_key=global_objects.DB_BINDKEYS_TO_CREATE)
-    #test_job(False)
     test_log(False)
 
 
@@ -439,5 +449,5 @@ def Not_Found(e):
     print(e)
     return "Didn found that" #Todo:put a actual page here
     
-if __name__ == "__main__":
+if __name__ == "__main__": #running the app
     app.run(debug=False)

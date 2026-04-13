@@ -28,8 +28,7 @@ jobtaker_lock = Lock()
 sessionmaker_jobtaker : sessionmaker
 jobmaker_lock = Lock()
 
-def init_module(application):
-    #initializes the users module
+def init_module(application): #initializes the users module
     with application.app_context():
         global app
         app = application
@@ -41,8 +40,7 @@ def init_module(application):
         global_objects.jobtaker_type = JobTaker
         global_objects.jobmaker_type = JobMaker
 
-def user_model_factory(bind_key, _roles):
-    #creates a user class/db model
+def user_model_factory(bind_key, _roles): #creates a user class/db model
     class DynamicUser(db.Model, UserMixin):
         __bind_key__ = bind_key
         __tablename__ = bind_key
@@ -64,7 +62,7 @@ def user_model_factory(bind_key, _roles):
         job_ammount_done = db.Column(db.Integer(), default=0, nullable=False)
         roles = _roles
     
-        def __init__(self, first_name, last_name, email, phone_number, country, city, birth_date, gender, pronouns):
+        def __init__(self, first_name, last_name, email, phone_number, country, city, birth_date, gender, pronouns): #constructor
             self.first_name = first_name
             self.last_name = last_name
             self.email = email
@@ -75,11 +73,11 @@ def user_model_factory(bind_key, _roles):
             self.gender = gender
             self.pronouns = pronouns
 
-        def __repr__(self) -> str:
+        def __repr__(self) -> str: #string representation of user
             return f"""User{'\n'}{self.id}{'\n'}{self.first_name}{'\n'}{self.last_name}{'\n'}{self.email}{'\n'}{self.phone_number}{'\n'}{self.country}{'\n'}{self.city}{'\n'}
         {self.birth_date}{'\n'}{self.time_registered}{'\n'}{self.confirmation_email_id}{'\n'}tcon {self.time_confirmed}{'\n'}{self.rating_avg}{'\n'}{self.job_ammount_done}{'\n'}{self.gender}{'\n'}{self.pronouns}{'\n'}"""
         
-        def revoke_registration(self, db_session : Session | None = None, commit : bool = True) -> bool:
+        def revoke_registration(self, db_session : Session | None = None, commit : bool = True) -> bool: #revokes the 'registered' status from a given user
             if self == global_objects.admin:
                 return False
             db_was_empty = db_session == None
@@ -94,7 +92,7 @@ def user_model_factory(bind_key, _roles):
                 db_session.close()
             return True
         
-        def confirm_registration(self, db_session : Session | None = None, commit : bool = True) -> bool:
+        def confirm_registration(self, db_session : Session | None = None, commit : bool = True) -> bool: #grants the 'registered' status to a given user
             if self.time_confirmed != None:
                 return False
             if self == global_objects.admin:
@@ -111,7 +109,7 @@ def user_model_factory(bind_key, _roles):
                 db_session.close()
             return True
         
-        def change_rating(self, rating : int, db_session : Session | None = None, commit : bool = True) -> bool:
+        def change_rating(self, rating : int, db_session : Session | None = None, commit : bool = True) -> bool: #changes the rating of a given user
             if self == global_objects.admin:
                 return False
             db_was_empty = db_session == None
@@ -129,7 +127,7 @@ def user_model_factory(bind_key, _roles):
                 db_session.close()
             return True
         
-        def increment_job_ammount_done(self, db_session : Session | None = None, commit : bool = True) -> bool:
+        def increment_job_ammount_done(self, db_session : Session | None = None, commit : bool = True) -> bool: #ticks up the ammount of jobs done by a user by one
             if self == global_objects.admin:
                 return False
             db_was_empty = db_session == None
@@ -142,7 +140,7 @@ def user_model_factory(bind_key, _roles):
                 db_session.close()
             return True
             
-        def edit_account(self, request : Request, db_session : Session | None = None, commit : bool = True) -> bool:#request.form should contain account data minus email and an old and new password
+        def edit_account(self, request : Request, db_session : Session | None = None, commit : bool = True) -> bool: #request.form should contain account data minus email and an old and new password
             #validates and changes user accesible data by a user request
             if self == global_objects.admin:
                 return False
@@ -164,13 +162,6 @@ def user_model_factory(bind_key, _roles):
                 user_type.gender : formated_data['gender'],
                 user_type.pronouns : f"{request.form['pronouns_1']}/{request.form['pronouns_2']}"
             })
-            #self.first_name = request.form['first_name']
-            #self.last_name = request.form['last_name']
-            #self.phone_number = phonenumbers.format_number(phone_number, PhoneNumberFormat.E164)
-            #self.country = country
-            #self.birth_date = birthdate
-            #self.gender = gender
-            #self.pronouns = f"{request.form['pronouns_1']}/{request.form['pronouns_2']}"
             db_session.flush()
             search = passwords.get_password_by_id(self.id, self.__bind_key__ == global_objects.JOBTAKERS_BINDKEY)
             if(search == None):
@@ -187,8 +178,7 @@ def user_model_factory(bind_key, _roles):
             print(self)
             return True
         
-        def delete_account(self, db_session : Session | None = None, commit : bool = True) -> bool:
-            #deletes a user account and password from the dbs
+        def delete_account(self, db_session : Session | None = None, commit : bool = True) -> bool: #deletes a user account and password from the dbs
             if self == global_objects.admin:
                 return False
             db_was_empty = db_session == None
@@ -212,33 +202,29 @@ def user_model_factory(bind_key, _roles):
         
     return DynamicUser
 
-JobTaker = user_model_factory(global_objects.JOBTAKERS_BINDKEY, {global_objects.jobtaker_role})
+JobTaker = user_model_factory(global_objects.JOBTAKERS_BINDKEY, {global_objects.jobtaker_role}) #defining classes
 JobMaker = user_model_factory(global_objects.JOBMAKERS_BINDKEY, {global_objects.jobmaker_role})
 Admin = user_model_factory("", {global_objects.jobtaker_role, global_objects.jobmaker_role, global_objects.admin_role})
 
-def get_user_type(is_jobtaker : bool):
-    #returns the user type for jobtakers or jobmakers
+def get_user_type(is_jobtaker : bool): #returns the user type for jobtakers or jobmakers
     if is_jobtaker:
         return JobTaker
     else:
         return JobMaker
     
-def get_user_session(is_jobtaker : bool) -> Session:
-    #returns a db session for jobtakers or jobmakers
+def get_user_session(is_jobtaker : bool) -> Session: #returns a db session for jobtakers or jobmakers
     if is_jobtaker:
         return sessionmaker_jobtaker()
     else:
         return sessionmaker_jobmaker()
     
-def get_session_lock(is_jobtaker : bool) -> Lock:
-    #returns a db session lock for jobtakers or jobmakers
+def get_session_lock(is_jobtaker : bool) -> Lock: #returns a db session lock for jobtakers or jobmakers
     if is_jobtaker:
         return jobtaker_lock()
     else:
         return jobmaker_lock()
 
-def get_user_by_id(user_id : int, is_jobtaker : bool) -> Tuple[Session, Query[Any]] | None:
-    #gets a user by id
+def get_user_by_id(user_id : int, is_jobtaker : bool) -> Tuple[Session, Query[Any]] | None: #gets a user by id
     if(user_id == 0):
         return None
     db_session = get_user_session(is_jobtaker)
@@ -249,8 +235,7 @@ def get_user_by_id(user_id : int, is_jobtaker : bool) -> Tuple[Session, Query[An
         return None
     return (db_session, query)
 
-def get_user_by_email(email : str, is_jobtaker : bool) -> Tuple[Session, Query[Any]] | None:
-    #gets user by email
+def get_user_by_email(email : str, is_jobtaker : bool) -> Tuple[Session, Query[Any]] | None: #gets user by email
     try:
         validate_email(email, check_deliverability=False)
     except EmailNotValidError as e:
@@ -266,8 +251,7 @@ def get_user_by_email(email : str, is_jobtaker : bool) -> Tuple[Session, Query[A
         return None
     return (db_session, query)
 
-def get_user_by_phone(phone_number : str | PhoneNumber, is_jobtaker : bool) -> Tuple[Session, Query[Any]] | None:
-    #gets user by phone number
+def get_user_by_phone(phone_number : str | PhoneNumber, is_jobtaker : bool) -> Tuple[Session, Query[Any]] | None: #gets user by phone number
     if(not isinstance(phone_number, PhoneNumber)):
         phone_number = phonenumbers.parse(phone_number)
     try:
@@ -287,8 +271,7 @@ def get_user_by_phone(phone_number : str | PhoneNumber, is_jobtaker : bool) -> T
     return (db_session, query)
 
 @login_manager.user_loader
-def load_user(user_id):
-    #gets a user depending on the session account type
+def load_user(user_id): #gets a user depending on the session account type (needed for login)
     if(session.get('account_type') == global_objects.ADMIN_SESSION_NAME):
         return global_objects.admin
     elif(session.get('account_type') == global_objects.JOBTAKER_SESSION_NAME or session.get('account_type') == global_objects.JOBMAKER_SESSION_NAME):
@@ -303,8 +286,7 @@ def load_user(user_id):
     else:
         return None
 
-def validate_user_request(request : Request, keys : List[str], check_email_deliverability : bool = False) -> Tuple[bool, Dict[str,  Any]]:
-    #checks if request.form contains parsable information
+def validate_user_request(request : Request, keys : List[str], check_email_deliverability : bool = False) -> Tuple[bool, Dict[str,  Any]]: #checks if request.form contains parsable information
     def handle_error(e):
         print(e)
         return (False, None)
@@ -373,8 +355,7 @@ def verify_login_attempt(request : Request, is_jobtaker : bool) -> bool:#request
     identity_changed.send(app, identity=Identity(user.id))
     return True
 
-def verify_admin_login_attempt(password) -> bool:
-    #checks admin login from user request
+def verify_admin_login_attempt(password) -> bool: #checks admin login from user request
     if(global_objects.admin_password.check_password_hash(password)):
         session['account_type'] = global_objects.ADMIN_SESSION_NAME
         login_user(global_objects.admin, remember=False, duration=0)
@@ -414,13 +395,13 @@ def register_user_account(request : Request, is_jobtaker : bool, confirmation_em
     if not passwords.add_user_password_to_db(user_id, request.form['password'], is_jobtaker): 
         user_session.close()
         return False
-    user_session.commit()#we commit it after adding the password, to avoid desync in case of failure to commit password
+    user_session.commit() #we commit it after adding the password, to avoid desync in case of failure to commit password
     session['account_type'] = global_objects.JOBTAKER_SESSION_NAME if is_jobtaker else global_objects.JOBMAKER_SESSION_NAME
     result = send_confirmation_email(user.id, is_jobtaker)
     user_session.close()
     return result
 
-def send_confirmation_email(user_id : int, is_jobtaker : bool) -> bool | str:#expects user to exist in db
+def send_confirmation_email(user_id : int, is_jobtaker : bool) -> bool | str: #expects user to exist in db
     (db_session, query) = get_user_by_id(user_id, is_jobtaker)
     user = query.first()
     user.confirmation_email_id = 0 if user.confirmation_email_id is None else user.confirmation_email_id + 1
@@ -428,7 +409,7 @@ def send_confirmation_email(user_id : int, is_jobtaker : bool) -> bool | str:#ex
         db_session.close()
         return False
     serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])
-    token = serializer.dumps({"id" : user.id, "is_jobtaker" : is_jobtaker, "confirmation_email_id" : user.confirmation_email_id}, salt=global_objects.EMAIL_CONFIRMATION_SALT)
+    token = serializer.dumps({"id" : user.id, "is_jobtaker" : is_jobtaker, "confirmation_email_id" : user.confirmation_email_id}, salt=global_objects.email_confirmation_salt)
     
     if global_objects.testing:
         db_session.commit()
@@ -453,7 +434,7 @@ def confirm_user_account(token : str, expiration_time : int = 3600) -> Tuple[Any
     #3 is signature expired (token to old)
     #4 is bad signature
     try:
-        user_data = URLSafeTimedSerializer(app.config['SECRET_KEY']).loads(token, salt=global_objects.EMAIL_CONFIRMATION_SALT, max_age=expiration_time)
+        user_data = URLSafeTimedSerializer(app.config['SECRET_KEY']).loads(token, salt=global_objects.email_confirmation_salt, max_age=expiration_time)
         print(user_data)
         search = get_user_by_id(user_data["id"], user_data["is_jobtaker"])
         if search is None:
@@ -469,7 +450,7 @@ def confirm_user_account(token : str, expiration_time : int = 3600) -> Tuple[Any
             return 2
         user = query.first()
         db_session.close()
-        return (user, user_data["is_jobtaker"]) #this is the most pythonic shit ever
+        return (user, user_data["is_jobtaker"])
     except SignatureExpired:
         return 3
     except BadSignature:
